@@ -1,0 +1,62 @@
+/* src/style.css */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap");
+
+body {
+  font-family: "Noto Sans KR", sans-serif;
+  line-height: 1.6;
+  margin: 0;
+  background-color: #f9f9f9;
+}
+
+/* (기존 app-header는 Sidebar가 대체했으므로 삭제/주석처리) */
+
+.app-main {
+  max-width: 900px;
+
+  /* ⭐️ (핵심) 'margin: 20px auto;' 대신 왼쪽 여백을 줘서 
+     사이드바의 호버 영역(5px)과 겹치지 않게 함 */
+  margin: 20px 20px 20px 40px; /* 위, 오른쪽, 아래, 왼쪽 */
+
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* ... (이하 .post-list, .post-detail 등 기존 스타일) ... */
+/* 글 목록 */
+.post-list {
+  list-style: none;
+  padding: 0;
+}
+.post-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.post-list li:hover {
+  background-color: #fafafa;
+}
+.post-list a {
+  text-decoration: none;
+  color: #222;
+  font-weight: 500;
+}
+.post-list span {
+  font-size: 0.9em;
+  color: #888;
+}
+
+/* 글 상세 */
+.post-detail .post-meta {
+  color: #555;
+  font-size: 0.9em;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+.post-detail .post-content {
+  min-height: 200px;
+  padding: 10px 0;
+  line-height: 1.7;
+}

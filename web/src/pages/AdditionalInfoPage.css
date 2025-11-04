@@ -1,0 +1,103 @@
+.additional-info-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.additional-info-container h2 {
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+
+.additional-info-container fieldset {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.additional-info-container legend {
+  font-weight: 700;
+  font-size: 1.1em;
+  padding: 0 10px;
+}
+
+.additional-info-container .required {
+  color: #e53e3e;
+  font-weight: 700;
+}
+
+/* 학과 선택 */
+.additional-info-container select {
+  width: 100%;
+  padding: 12px;
+  font-size: 1em;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: white;
+}
+
+/* 태그 목록 */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tag-btn {
+  padding: 8px 16px;
+  font-size: 0.95em;
+  border: 1px solid #ccc;
+  border-radius: 20px; /* 둥근 알약 형태 */
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tag-btn:hover {
+  background-color: #f0f0f0;
+  border-color: #bbb;
+}
+
+/* 선택된 태그 */
+.tag-btn.selected {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+  font-weight: 500;
+}
+
+.additional-info-container small {
+  display: block;
+  margin-top: 10px;
+  color: #555;
+}
+
+/* 에러 메시지 */
+.error-message {
+  color: #e53e3e;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* 가입 완료 버튼 */
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1em;
+  font-weight: 700;
+  color: white;
+  background-color: #28a745;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submit-btn:hover {
+  background-color: #218838;
+}
+
+.submit-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}

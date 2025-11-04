@@ -1,0 +1,117 @@
+/* src/components/Sidebar.css */
+
+/* --- 1. 사이드바 기본 레이아웃 및 호버 효과 --- */
+.sidebar {
+  position: fixed; /* 1. 화면에 고정 */
+  left: 0;
+  top: 0;
+  height: 100vh; /* 2. 화면 전체 높이 */
+  width: 250px;
+  background: #ffffff;
+  border-right: 1px solid #e0e0e0;
+  z-index: 1000; /* 3. 다른 요소들 위에 표시 */
+
+  display: flex; /* 4. (추가) 내부 요소를 세로로 정렬 */
+  flex-direction: column; /* 5. (추가) 위(프로필) -> 아래(게시판) */
+
+  /* 6. (핵심) 평소에는 왼쪽으로 숨기기 */
+  /* 250px 너비에서 5px만 남기고(trigger) 숨깁니다. */
+  transform: translateX(-240px);
+
+  /* 7. 부드러운 애니메이션 효과 */
+  transition: transform 0.3s ease-in-out;
+}
+
+/* 8. (핵심) 마우스를 사이드바에 올렸을 때 */
+.sidebar:hover {
+  transform: translateX(0); /* 9. 원래 위치로 펼치기 */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* 10. 그림자 효과 */
+}
+
+/* --- 2. ⭐️ 프로필/로그인 영역 --- */
+.sidebar-profile {
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  background-color: #fcfcfc;
+}
+
+.welcome-msg {
+  font-weight: 700;
+  font-size: 1.1em;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #f1f1f1;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+.logout-btn:hover {
+  background-color: #e0e0e0;
+}
+
+/* 로그인 버튼 공통 스타일 */
+.login-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 700;
+  text-align: center;
+  box-sizing: border-box; /* padding이 width를 넘지 않게 */
+  transition: opacity 0.2s;
+}
+.login-btn:hover {
+  opacity: 0.85;
+}
+
+/* 소셜별 버튼 디자인 */
+.login-btn.google {
+  background-color: #4285f4;
+  color: white;
+  border: 1px solid #4285f4;
+}
+
+/* ... (네이버, 카카오 버튼은 나중에 추가) ... */
+
+/* --- 3. ⭐️ 게시판 목록 영역 --- */
+.sidebar-title {
+  margin-top: 0;
+  padding: 20px 20px 10px 20px;
+  border-bottom: 2px solid #f0f0f0;
+  flex-shrink: 0; /* (추가) 영역이 줄어들지 않게 */
+}
+.sidebar-title a {
+  text-decoration: none;
+  color: #333;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0 10px;
+  margin: 10px 0;
+  overflow-y: auto; /* (추가) 게시판 많아지면 스크롤 */
+  flex-grow: 1; /* (추가) 남은 공간 모두 차지 */
+}
+
+.sidebar li a {
+  display: block;
+  padding: 10px 15px;
+  text-decoration: none;
+  color: #555;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+.sidebar li a:hover {
+  background-color: #f4f4f4;
+  color: #000;
+  font-weight: 500;
+}

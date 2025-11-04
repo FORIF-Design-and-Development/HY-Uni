@@ -40,3 +40,19 @@
 .read-the-docs {
   color: #888;
 }
+.app-main {
+  max-width: 900px;
+
+  /* 🔽 (수정) 'margin: 20px auto;' 대신 왼쪽 여백을 줘서 사이드바와 겹치지 않게 함 */
+  margin: 20px 20px 20px 40px; /* 위, 오른쪽, 아래, 왼쪽 */
+  /* (왼쪽 40px = 사이드바 트리거 5px + 추가 여백 35px) */
+
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+  /* 🔽 (추가) 사이드바가 펼쳐질 때 부드럽게 밀려나도록 트랜지션 추가 */
+  /* (이 기능은 .sidebar:hover + .app-main { ... } 같은 복잡한 CSS가 필요합니다.) */
+  /* (지금은 오버레이(overlay) 방식이므로 이 코드는 불필요) */
+}
