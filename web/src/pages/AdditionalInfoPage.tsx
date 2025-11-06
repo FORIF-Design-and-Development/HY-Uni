@@ -27,6 +27,9 @@ function AdditionalInfoPage() {
   const [error, setError] = useState<string | null>(null);
 
   // 3. 페이지 로드 시 학과 및 태그 목록 불러오기
+  // hook : 리액트에서 상태, 생명주기  관리
+  // useEffect() : 상태 관리
+  // 상태 값,
   useEffect(() => {
     Promise.all([getDepartments(), getTags()])
       .then(([deptData, tagData]) => {
