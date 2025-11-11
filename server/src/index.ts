@@ -1,8 +1,8 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import { pool } from './config/db.js';
-import { corsMiddleware } from './middlewares/cors.js';
-import { notFound, errorHandler } from './middlewares/error.js';
+import express from "express";
+import dotenv from "dotenv";
+import { pool } from "./config/db.js";
+import { corsMiddleware } from "./middlewares/cors.js";
+import { notFound, errorHandler } from "./middlewares/error.js";
 
 dotenv.config();
 
@@ -15,18 +15,19 @@ app.use(notFound);
 app.use(errorHandler);
 
 //기본 라우트
-app.get('/', (_req, res) => {
+app.get("/", (_req, res) => {
   res.json({ ok: true });
+  console.log("hello");
 });
 
 //DB 연결 테스트
 (async () => {
   try {
     const conn = await pool.getConnection();
-    console.log('MySQL 연결 성공');
+    console.log("MySQL 연결 성공");
     conn.release();
   } catch (err) {
-    console.error('MySQL 연결 실패:', (err as Error).message);
+    console.error("MySQL 연결 실패:", (err as Error).message);
     process.exit(1);
   }
 })();
