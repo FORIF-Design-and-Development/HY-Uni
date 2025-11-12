@@ -1,0 +1,220 @@
+<body>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      max-width: 500px;
+    }
+    div {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input,
+    textarea {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    textarea {
+      height: 100px;
+    }
+    button {
+      padding: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    button.post {
+      background-color: #007bff;
+      color: white;
+    }
+    button.put {
+      background-color: #ffc107;
+      color: black;
+    }
+    button.delete {
+      background-color: #dc3545;
+      color: white;
+    }
+    pre {
+      background-color: #f4f4f4;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    .success {
+      color: green;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+
+  <h1>API 테스트 페이지</h1>
+  <p>서버 주소: http://localhost:3000/api/notices</p>
+
+  <hr />
+  <h2>공지사항 생성 (POST /)</h2>
+  <form id="noticeForm">
+    <div>
+      <label for="title">제목:</label>
+      <input type="text" id="title" value="HTML 테스트 제목" required />
+    </div>
+    <div>
+      <label for="author">작성자:</label>
+      <input type="text" id="author" value="테스터" />
+    </div>
+    <div>
+      <label for="content">내용:</label>
+      <textarea id="content" required>
+HTML 파일에서 작성한 내용입니다.</textarea
+      >
+    </div>
+    <button type="submit" class="post">공지사항 생성 (POST 요청)</button>
+  </form>
+
+  <hr />
+  <h2>공지사항 수정 (PUT /:id)</h2>
+  <form id="updateForm">
+    <div>
+      <label for="updateId">수정할 ID:</label>
+      <input type="number" id="updateId" placeholder="예: 1" required />
+    </div>
+    <div>
+      <label for="updateTitle">수정할 제목:</label>
+      <input type="text" id="updateTitle" value="[수정된] 제목" required />
+    </div>
+    <div>
+      <label for="updateAuthor">수정할 작성자:</label>
+      <input type="text" id="updateAuthor" value="수정자" />
+    </div>
+    <div>
+      <label for="updateContent">수정할 내용:</label>
+      <textarea id="updateContent" required>[수정된] 내용입니다.</textarea>
+    </div>
+    <button type="submit" class="put">공지사항 수정 (PUT 요청)</button>
+  </form>
+
+  <hr />
+  <h2>공지사항 삭제 (DELETE /:id)</h2>
+  <form id="deleteForm">
+    <div>
+      <label for="deleteId">삭제할 ID:</label>
+      <input type="number" id="deleteId" placeholder="예: 2" required />
+    </div>
+    <button type="submit" class="delete">공지사항 삭제 (DELETE 요청)</button>
+  </form>
+
+  <hr />
+  <h2>테스트 결과</h2>
+  <pre id="result">여기에 서버 응답이 표시됩니다.</pre>
+
+  <script>
+    const resultEl = document.getElementById("result");
+    const BASE_URL = "http://localhost:3000/api/notices";
+
+    // 1. POST (생성) 이벤트 리스너
+    document
+      .getElementById("noticeForm")
+      .addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = {
+          title: document.getElementById("title").value,
+          author: document.getElementById("author").value,
+          content: document.getElementById("content").value,
+        };
+
+        // fetch 호출
+        await performFetch(
+          BASE_URL,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          },
+          "201 Created"
+        );
+      });
+
+    // 2. PUT (수정) 이벤트 리스너
+    document
+      .getElementById("updateForm")
+      .addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("updateId").value;
+        if (!id) return; // ID가 없으면 중단
+
+        const data = {
+          title: document.getElementById("updateTitle").value,
+          author: document.getElementById("updateAuthor").value,
+          content: document.getElementById("updateContent").value,
+        };
+
+        // fetch 호출 (URL에 ID 포함)
+        await performFetch(
+          `${BASE_URL}/${id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          },
+          "200 OK"
+        );
+      });
+
+    // 3. DELETE (삭제) 이벤트 리스너
+    document
+      .getElementById("deleteForm")
+      .addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("deleteId").value;
+        if (!id) return; // ID가 없으면 중단
+
+        // fetch 호출 (URL에 ID 포함)
+        await performFetch(
+          `${BASE_URL}/${id}`,
+          {
+            method: "DELETE",
+          },
+          "204 No Content"
+        );
+      });
+
+    // 4. [공통] Fetch 실행 및 결과 표시 함수
+    async function performFetch(url, options, expectedStatus) {
+      try {
+        const response = await fetch(url, options);
+
+        // DELETE (204)는 body가 비어있으므로 예외 처리
+        if (response.status === 204) {
+          resultEl.textContent = `✅ [성공] (Status: ${expectedStatus})\n\n(본문 없음)`;
+          resultEl.className = "success";
+          return;
+        }
+
+        // 나머지 응답은 JSON으로 파싱
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            `[${response.status}] ${JSON.stringify(responseData)}`
+          );
+        }
+
+        resultEl.textContent =
+          `✅ [성공] (Status: ${expectedStatus})\n\n` +
+          JSON.stringify(responseData, null, 2);
+        resultEl.className = "success";
+      } catch (error) {
+        resultEl.textContent = "❌ [실패] \n" + error.message;
+        resultEl.className = "error";
+      }
+    }
+  </script>
+</body>
