@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>학교 주변 시설 지도</title>
+    <style>
+      /* 지도가 화면에 꽉 차도록 설정 */
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* 스크롤바 제거 */
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+      }
+      /* 💡 [수정] 인포윈도우(정보창) 스타일 */
+      .infowindow {
+        padding: 10px 12px;
+        font-size: 14px;
+        font-family: sans-serif;
+        font-weight: bold;
+        width: 150px; /* 가로 폭 지정 */
+        text-align: center; /* 텍스트 중앙 정렬 */
+        line-height: 1.5;
+      }
+      /* 💡 [신규] 인포윈도우 내부의 버튼 스타일 */
+      .infowindow button {
+        margin-top: 8px;
+        padding: 5px 10px;
+        font-size: 12px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 3px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 1. 지도를 표시할 div 입니다 -->
+    <div id="map"></div>
+
+    <!-- 
+	2. ⭐️ 카카오 맵 SDK 로드 ⭐️
+	'YOUR_KAKAO_APP_KEY' 부분에 본인의 JavaScript 키를 꼭 넣어주세요!
+-->
+    <script
+      type="text/javascript"
+      src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=de5695a03562c8c067e248883267921f"
+    ></script>
+    <script>
+      // 3. 지도를 생성합니다
+      const mapContainer = document.getElementById("map");
+      const mapOptions = {
+        center: new kakao.maps.LatLng(37.4789123, 126.9536245),
+        level: 5,
+      };
+      const map = new kakao.maps.Map(mapContainer, mapOptions);
+
+      // 💡 [신규] 리뷰 작성 창을 여는 함수
+      // (kakao.maps.load 밖으로 빼서 전역 함수로 만들어야 onclick에서 인식합니다)
+      function openReviewModal(placeId, placeName) {
+        // ⭐️ 'review.html'을 새 창으로 엽니다.
+        // (실제 서비스에서는 모달 팝업이 더 좋습니다.)
+        const reviewPageUrl = `review.html?placeId=${placeId}`;
+
+        // (테스트용) 새 탭으로 열기
+        window.open(reviewPageUrl, "_blank");
+
+        // (참고) alert 대신 팝업을 띄우는 코드
+        // alert(`'${placeName}' (ID: ${placeId}) 리뷰 작성 창을 엽니다.`);
+      }
+
+      // 4. 백엔드 서버에서 장소 데이터를 가져오는 함수
+      async function loadAndDisplayMarkers() {
+        try {
+          const response = await fetch("http://localhost:3000/api/places");
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const places = await response.json();
+
+          // 5. 가져온 데이터(places 배열)를 순회하며 마커를 생성합니다
+          places.forEach((place) => {
+            const markerPosition = new kakao.maps.LatLng(
+              place.latitude,
+              place.longitude
+            );
+
+            const marker = new kakao.maps.Marker({
+              position: markerPosition,
+              title: place.name,
+            });
+
+            marker.setMap(map);
+
+            // 6. 💡 [수정] 인포윈도우에 '리뷰 작성' 버튼 추가
+            // (placeId와 placeName을 `openReviewModal` 함수로 전달)
+            const iwContent = `
+					<div class="infowindow">
+						${place.name}
+						<br>
+						<button onclick="openReviewModal(${place.placeId}, '${place.name.replace(
+              /'/g,
+              "\\'"
+            )}')">
+							리뷰 작성/조회
+						</button>
+					</div>`;
+
+            const infowindow = new kakao.maps.InfoWindow({
+              content: iwContent,
+              removable: true,
+            });
+
+            kakao.maps.event.addListener(marker, "click", function () {
+              infowindow.open(map, marker);
+            });
+          });
+        } catch (error) {
+          console.error("장소 데이터를 가져오는 데 실패했습니다:", error);
+          alert(
+            "서버에서 데이터를 가져오는 데 실패했습니다. (서버가 켜져있는지 확인하세요)"
+          );
+        }
+      }
+
+      // 7. 카카오 맵 라이브러리 로드가 완료되면, 데이터를 로드하고 마커를 표시합니다
+      kakao.maps.load(function () {
+        loadAndDisplayMarkers();
+      });
+    </script>
+  </body>
+</html>

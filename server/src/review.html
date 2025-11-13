@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>리뷰 관리 페이지</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+        background-color: #f9f9f9;
+      }
+      .container {
+        max-width: 700px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 10px;
+      }
+      .average-rating {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #f5a623;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      h2 {
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+        color: #555;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+      form div {
+        display: flex;
+        flex-direction: column;
+      }
+      form label {
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #666;
+      }
+      form input,
+      form textarea,
+      form select {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      form button {
+        padding: 12px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 16px;
+        font-weight: bold;
+      }
+      /* 💡 [신규] 수정/취소 버튼 */
+      #btn-cancel-edit {
+        background-color: #6c757d;
+        display: none; /* 평소엔 숨김 */
+      }
+      form button:hover {
+        background-color: #0056b3;
+      }
+      #review-list {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .review-item {
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 5px;
+        background: #fafafa;
+      }
+      .review-item strong {
+        font-size: 1.2em;
+        color: #e6a623;
+      }
+      .review-item p {
+        margin: 10px 0;
+        font-size: 15px;
+      }
+      .review-item img {
+        max-width: 100%;
+        border-radius: 4px;
+        margin-top: 10px;
+      }
+      .review-item small {
+        color: #888;
+        font-size: 12px;
+      }
+      /* 💡 [신규] 리뷰 카드 내 버튼 */
+      .review-item .actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 10px;
+      }
+      .review-item .actions button {
+        padding: 5px 8px;
+        font-size: 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .review-item .btn-delete {
+        background-color: #dc3545;
+        color: white;
+      }
+      .review-item .btn-edit {
+        background-color: #ffc107;
+        color: black;
+      }
+
+      #result-message {
+        text-align: center;
+        font-weight: bold;
+        padding: 10px;
+        border-radius: 5px;
+      }
+      .success {
+        color: green;
+        background-color: #e6ffed;
+      }
+      .error {
+        color: red;
+        background-color: #ffeeed;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1><span id="place-name">...</span> 리뷰</h1>
+      <p id="average-rating" class="average-rating"></p>
+
+      <!-- 1. 새 리뷰/수정 폼 -->
+      <h2 id="form-title">리뷰 작성하기</h2>
+      <form id="reviewForm">
+        <input type="hidden" id="userId" value="1" />
+        <!-- 💡 [신규] 수정 시 reviewId를 저장할 숨겨진 필드 -->
+        <input type="hidden" id="editingReviewId" value="" />
+
+        <div>
+          <label for="rating">별점 (0.5 ~ 5.0):</label>
+          <select id="rating" required>
+            <option value="5">★★★★★ (5.0)</option>
+            <option value="4.5">★★★★☆ (4.5)</option>
+            <option value="4">★★★★☆ (4.0)</option>
+            <option value="3.5">★★★☆☆ (3.5)</option>
+            <option value="3">★★★☆☆ (3.0)</option>
+            <option value="2.5">★★☆☆☆ (2.5)</option>
+            <option value="2">★★☆☆☆ (2.0)</option>
+            <option value="1.5">★☆☆☆☆ (1.5)</option>
+            <option value="1">★☆☆☆☆ (1.0)</option>
+            <option value="0.5">☆☆☆☆☆ (0.5)</option>
+          </select>
+        </div>
+        <div>
+          <label for="comment">리뷰 본문:</label>
+          <textarea id="comment" rows="4"></textarea>
+        </div>
+        <div>
+          <label for="imageUrl">사진 URL (선택 사항):</label>
+          <input
+            type="url"
+            id="imageUrl"
+            placeholder="https://example.com/image.jpg"
+          />
+        </div>
+        <button type="submit" id="btn-submit">리뷰 제출</button>
+        <!-- 💡 [신규] 수정 취소 버튼 -->
+        <button type="button" id="btn-cancel-edit" onclick="cancelEdit()">
+          수정 취소
+        </button>
+      </form>
+
+      <div id="result-message"></div>
+
+      <!-- 2. 기존 리뷰 목록 -->
+      <h2>작성된 리뷰</h2>
+      <div id="review-list">
+        <p>리뷰를 불러오는 중...</p>
+      </div>
+    </div>
+
+    <script>
+      const reviewListEl = document.getElementById("review-list");
+      const reviewForm = document.getElementById("reviewForm");
+      const placeNameEl = document.getElementById("place-name");
+      const resultMsgEl = document.getElementById("result-message");
+      const avgRatingEl = document.getElementById("average-rating");
+
+      // 💡 [신규] 폼 엘리먼트
+      const formTitle = document.getElementById("form-title");
+      const editingReviewIdInput = document.getElementById("editingReviewId");
+      const btnSubmit = document.getElementById("btn-submit");
+      const btnCancelEdit = document.getElementById("btn-cancel-edit");
+      // 폼 입력 필드
+      const ratingEl = document.getElementById("rating");
+      const commentEl = document.getElementById("comment");
+      const imageUrlEl = document.getElementById("imageUrl");
+      const userIdEl = document.getElementById("userId");
+
+      let CURRENT_PLACE_ID = null;
+      const BASE_API_URL = "http://localhost:3000/api";
+      // 💡 [신규] 현재 리뷰 데이터를 메모리에 저장 (수정 시 원본 데이터 참조용)
+      let currentReviews = [];
+
+      // 1. 페이지 로드 시
+      document.addEventListener("DOMContentLoaded", () => {
+        const params = new URLSearchParams(window.location.search);
+        const placeId = params.get("placeId");
+        if (!placeId) {
+          document.body.innerHTML =
+            "<h1>오류: URL에 ?placeId=N 파라미터가 필요합니다.</h1>";
+          return;
+        }
+        CURRENT_PLACE_ID = placeId;
+        loadPlaceDetails(placeId);
+        loadReviews(placeId);
+      });
+
+      // 2. (GET) 장소 상세 정보
+      async function loadPlaceDetails(placeId) {
+        try {
+          const response = await fetch(`${BASE_API_URL}/places/${placeId}`);
+          if (!response.ok) throw new Error("장소 정보 로드 실패");
+          const place = await response.json();
+          placeNameEl.textContent = place.name;
+          avgRatingEl.textContent = `⭐ ${place.averageRating.toFixed(2)} (${
+            place.reviewCount
+          }개 리뷰)`;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // 3. (GET) 리뷰 목록 불러오기
+      async function loadReviews(placeId) {
+        try {
+          const response = await fetch(
+            `${BASE_API_URL}/places/${placeId}/reviews`
+          );
+          if (!response.ok) throw new Error("리뷰 로드 실패");
+
+          currentReviews = await response.json(); // 💡[신규] 리뷰 데이터 저장
+
+          reviewListEl.innerHTML = "";
+          if (currentReviews.length === 0) {
+            reviewListEl.innerHTML = "<p>작성된 리뷰가 없습니다.</p>";
+            return;
+          }
+          currentReviews.forEach(renderReview);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      // 4. (POST / PUT) 폼 제출 (생성 또는 수정)
+      reviewForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!CURRENT_PLACE_ID) return;
+
+        const reviewId = editingReviewIdInput.value; // 💡[수정] 수정 중인 ID 확인
+        const isEditing = !!reviewId;
+
+        const data = {
+          userId: parseInt(userIdEl.value, 10),
+          rating: parseFloat(ratingEl.value),
+          comment: commentEl.value,
+          imageUrl: imageUrlEl.value || null,
+        };
+
+        const method = isEditing ? "PUT" : "POST";
+        const url = isEditing
+          ? `${BASE_API_URL}/places/${CURRENT_PLACE_ID}/reviews/${reviewId}`
+          : `${BASE_API_URL}/places/${CURRENT_PLACE_ID}/reviews`;
+
+        try {
+          const response = await fetch(url, {
+            method: method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+
+          // 💡 [수정] 204 No Content (DELETE)는 json()을 호출하면 안 됨
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "요청 실패");
+          }
+
+          const resultData = await response.json();
+
+          if (isEditing) {
+            // 💡 [신규] 수정 성공
+            showMessage("리뷰가 수정되었습니다!", "success");
+            // 1. 메모리에 있는 데이터 업데이트
+            const index = currentReviews.findIndex(
+              (r) => r.reviewId == reviewId
+            );
+            if (index > -1) {
+              currentReviews[index] = resultData;
+            }
+            // 2. 화면 다시 그리기
+            reviewListEl.innerHTML = "";
+            currentReviews.forEach(renderReview);
+            // 3. 폼 초기화
+            cancelEdit();
+          } else {
+            // (C) 생성 성공
+            showMessage("리뷰가 성공적으로 등록되었습니다!", "success");
+            currentReviews.unshift(resultData); // 💡[신규] 메모리에 추가
+            renderReview(resultData, true); // 새 리뷰를 목록 맨 위에 추가
+            reviewForm.reset();
+          }
+
+          updateAverageRating(CURRENT_PLACE_ID); // 평점 실시간 업데이트
+        } catch (error) {
+          console.error(error);
+          showMessage(`오류: ${error.message}`, "error");
+        }
+      });
+
+      // 5. 리뷰 1개를 HTML로 렌더링
+      function renderReview(review, prepend = false) {
+        const reviewEl = document.createElement("div");
+        reviewEl.className = "review-item";
+        reviewEl.id = `review-${review.reviewId}`; // 💡 ID 부여
+
+        const ratingStars =
+          "★".repeat(Math.floor(review.rating)) +
+          (review.rating % 1 !== 0 ? "☆" : "");
+
+        reviewEl.innerHTML = `
+          <div>
+            <strong>${ratingStars} (${review.rating.toFixed(1)})</strong>
+            <small> - (User ID: ${review.userId})</small> 
+          </div>
+          <p>${review.comment || "(내용 없음)"}</p>
+          ${
+            review.imageUrl
+              ? `<img src="${review.imageUrl}" alt="리뷰 사진">`
+              : ""
+          }
+          <small>${new Date(review.createdAt).toLocaleString()}</small>
+          <!-- 💡 [신규] 수정/삭제 버튼 (reviewId 전달) -->
+          <div class="actions">
+            <button class="btn-edit" onclick="handleEdit(${
+              review.reviewId
+            })">수정</button>
+            <button class="btn-delete" onclick="handleDelete(${
+              review.reviewId
+            })">삭제</button>
+          </div>
+        `;
+
+        if (prepend) {
+          const noReviewEl = reviewListEl.querySelector("p");
+          if (
+            noReviewEl &&
+            noReviewEl.textContent.includes("작성된 리뷰가 없습니다")
+          ) {
+            noReviewEl.remove();
+          }
+          reviewListEl.prepend(reviewEl);
+        } else {
+          reviewListEl.appendChild(reviewEl);
+        }
+      }
+
+      // 6. 결과 메시지 표시
+      function showMessage(message, type) {
+        resultMsgEl.textContent = message;
+        resultMsgEl.className = type;
+        setTimeout(() => {
+          resultMsgEl.textContent = "";
+        }, 4000);
+      }
+
+      // 7. 평균 평점만 다시 로드
+      async function updateAverageRating(placeId) {
+        try {
+          const response = await fetch(`${BASE_API_URL}/places/${placeId}`);
+          if (!response.ok) return;
+          const place = await response.json();
+          avgRatingEl.textContent = `⭐ ${place.averageRating.toFixed(2)} (${
+            place.reviewCount
+          }개 리뷰)`;
+        } catch (e) {
+          console.error("Failed to update average rating", e);
+        }
+      }
+
+      // --- 💡 [신규] CRUD 버튼 핸들러 ---
+
+      // 8. (D) 삭제 버튼 클릭
+      async function handleDelete(reviewId) {
+        if (!confirm("정말로 이 리뷰를 삭제하시겠습니까?")) {
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `${BASE_API_URL}/places/${CURRENT_PLACE_ID}/reviews/${reviewId}`,
+            { method: "DELETE" }
+          );
+
+          // 💡 [수정] 204 No Content는 .json()을 호출하지 않음
+          if (!response.ok) {
+            // 204가 아닌 경우 (404, 500 등)
+            const errorData = await response.json();
+            throw new Error(errorData.message || "삭제 실패");
+          }
+
+          // 성공 (204 No Content)
+          showMessage("리뷰가 삭제되었습니다.", "success");
+
+          // 1. 화면에서 제거
+          document.getElementById(`review-${reviewId}`).remove();
+          // 2. 메모리에서 제거
+          currentReviews = currentReviews.filter(
+            (r) => r.reviewId !== reviewId
+          );
+          // 3. 평점 업데이트
+          updateAverageRating(CURRENT_PLACE_ID);
+        } catch (error) {
+          console.error(error);
+          showMessage(`오류: ${error.message}`, "error");
+        }
+      }
+
+      // 9. (U) 수정 버튼 클릭
+      function handleEdit(reviewId) {
+        // 1. 메모리에서 수정할 리뷰 찾기
+        const reviewToEdit = currentReviews.find(
+          (r) => r.reviewId === reviewId
+        );
+        if (!reviewToEdit) return;
+
+        // 2. 폼을 '수정 모드'로 변경
+        formTitle.textContent = "리뷰 수정하기";
+        btnSubmit.textContent = "수정 완료";
+        btnCancelEdit.style.display = "block"; // 수정 취소 버튼 표시
+
+        // 3. 폼에 기존 데이터 채우기
+        editingReviewIdInput.value = reviewToEdit.reviewId;
+        ratingEl.value = reviewToEdit.rating.toFixed(1);
+        commentEl.value = reviewToEdit.comment || "";
+        imageUrlEl.value = reviewToEdit.imageUrl || "";
+        // (userId는 이미 1로 고정)
+
+        // 4. 폼으로 스크롤
+        reviewForm.scrollIntoView({ behavior: "smooth" });
+      }
+
+      // 10. (U) 수정 취소 버튼 클릭
+      function cancelEdit() {
+        // 1. 폼을 '생성 모드'로 되돌리기
+        formTitle.textContent = "리뷰 작성하기";
+        btnSubmit.textContent = "리뷰 제출";
+        btnCancelEdit.style.display = "none";
+
+        // 2. 폼 내용 초기화
+        editingReviewIdInput.value = "";
+        reviewForm.reset();
+      }
+    </script>
+  </body>
+</html>
