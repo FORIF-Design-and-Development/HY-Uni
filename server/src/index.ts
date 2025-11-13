@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { pool } from './config/db.js';
 import { corsMiddleware } from './middlewares/cors.js';
 import { notFound, errorHandler } from './middlewares/error.js';
+import communityRoutes from './routes/community/community.routes.js';
 
 dotenv.config();
 
@@ -11,6 +12,10 @@ const port = Number(process.env.PORT || 3000);
 
 app.use(corsMiddleware);
 app.use(express.json());
+
+// 커뮤니티 라우터 등록
+app.use('/api/community', communityRoutes);
+
 app.use(notFound);
 app.use(errorHandler);
 
