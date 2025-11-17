@@ -1,8 +1,10 @@
-import express from 'express';
 import dotenv from 'dotenv';
+import express from 'express';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
-import { notFound, errorHandler } from './middlewares/error';
+import { errorHandler, notFound } from './middlewares/error';
+import cafeteriaRoutes from './routes/campus/cafeteria.routes';
+import menuRoutes from './routes/campus/menu.routes';
 import communityRoutes from './routes/community/community.routes';
 
 dotenv.config();
@@ -15,6 +17,10 @@ app.use(express.json());
 
 // 커뮤니티 라우터 등록
 app.use('/api/community', communityRoutes);
+
+// 캠퍼스 학식 라우터 등록
+app.use('/api/cafeterias', cafeteriaRoutes);
+app.use('/api/menus', menuRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -37,5 +43,5 @@ app.get('/', (_req, res) => {
 })();
 
 app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`);
+    console.log(`Server listening on http://localhost:${port}`);
 });
