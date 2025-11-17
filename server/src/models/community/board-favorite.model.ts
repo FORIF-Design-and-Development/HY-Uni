@@ -1,5 +1,5 @@
 import type { RowDataPacket } from 'mysql2/promise';
-import { pool } from '../../config/db.js';
+import { pool } from '../../config/db';
 
 // DB 테이블 이름을 상수로 관리
 export const BOARD_FAVORITES_TABLE = 'board_favorite';

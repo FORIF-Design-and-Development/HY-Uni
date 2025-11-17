@@ -3,8 +3,8 @@ import {
   getBoards,
   toggleBoardFavorite,
   toggleBoardSubscription,
-} from '../../controllers/community/boards.controller.js';
-import { getPopularSearch } from '../../controllers/community/search.controller.js';
+} from '../../controllers/community/boards.controller';
+import { getPopularSearch } from '../../controllers/community/search.controller';
 
 // 게시판 라우트
 const router = Router();

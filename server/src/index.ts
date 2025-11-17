@@ -1,9 +1,9 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { pool } from './config/db.js';
-import { corsMiddleware } from './middlewares/cors.js';
-import { notFound, errorHandler } from './middlewares/error.js';
-import communityRoutes from './routes/community/community.routes.js';
+import { pool } from './config/db';
+import { corsMiddleware } from './middlewares/cors';
+import { notFound, errorHandler } from './middlewares/error';
+import communityRoutes from './routes/community/community.routes';
 
 dotenv.config();
 

@@ -2,17 +2,17 @@ import type { Request, Response, NextFunction } from 'express';
 import {
   findBoardById,
   findBoardsWithUserFlags,
-} from '../../models/community/board.model.js';
+} from '../../models/community/board.model';
 import {
   addBoardFavorite,
   isBoardFavorite,
   removeBoardFavorite,
-} from '../../models/community/board-favorite.model.js';
+} from '../../models/community/board-favorite.model';
 import {
   addBoardSubscription,
   isBoardSubscribed,
   removeBoardSubscription,
-} from '../../models/community/board-subscription.model.js';
+} from '../../models/community/board-subscription.model';
 
 interface RequestWithUser extends Request {
   user?: { id?: number };

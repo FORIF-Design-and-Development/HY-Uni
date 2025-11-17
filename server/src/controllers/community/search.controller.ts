@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { findPopularSearchRankings } from '../../models/community/popular-search.model.js';
+import { findPopularSearchRankings } from '../../models/community/popular-search.model';
 
 const DEFAULT_LIMIT = 10;
 
