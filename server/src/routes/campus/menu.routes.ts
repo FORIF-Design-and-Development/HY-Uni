@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { cafeteriaController } from '../../controllers/campus/cafeteria.controller.js';
+import { cafeteriaController } from '../../controllers/campus/cafeteria.controller';
 
 const router = Router();
 

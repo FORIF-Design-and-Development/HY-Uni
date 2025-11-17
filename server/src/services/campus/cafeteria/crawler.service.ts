@@ -1,5 +1,5 @@
 // server/src/services/campus/cafeteria/crawler.service.ts
-import { CrawlResult, HanyangCrawler } from './cafeteria-crawler.js';
+import { CrawlResult, HanyangCrawler } from './cafeteria-crawler';
 
 interface CacheItem {
     data: CrawlResult;

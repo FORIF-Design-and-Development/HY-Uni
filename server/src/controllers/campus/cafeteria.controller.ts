@@ -1,7 +1,7 @@
-// server/src/controllers/campus/cafeteria.controller.ts
+// server/src/controllers/campus/cafeteria.controller
 import { Request, Response } from 'express';
-import type { Cafeteria } from '../../services/campus/cafeteria/cafeteria-crawler.js';
-import { cafeteriaCrawlerService } from '../../services/campus/cafeteria/crawler.service.js';
+import type { Cafeteria } from '../../services/campus/cafeteria/cafeteria-crawler';
+import { cafeteriaCrawlerService } from '../../services/campus/cafeteria/crawler.service';
 
 // 매핑 테이블 import 추가. 추후 수정
 import {

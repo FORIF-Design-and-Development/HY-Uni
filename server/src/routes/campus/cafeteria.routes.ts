@@ -1,12 +1,7 @@
-// server/src/routes/campus/cafeteria.routes.ts
 import { Router } from 'express';
-import { cafeteriaController } from '../../controllers/campus/cafeteria.controller.js';
+import { cafeteriaController } from '../../controllers/campus/cafeteria.controller';
 
 const router = Router();
-
-// ======================
-// 식당 관련 엔드포인트 (/api/cafeterias)
-// ======================
 
 // 2-10-1. 식당 목록 조회(List)
 // GET /api/cafeterias
