@@ -8,7 +8,7 @@ import {
     getCafeteriaIdByName,
     getCafeteriaInfoById,
     normalizeCafeteriaName
-} from '../../config/cafeteria-mapping.js';
+} from '../../config/cafeteria-mapping';
 
 export class CafeteriaController {
     
