@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import ExamplePage from './pages/ExamplePage';
+import RegisterTest from './pages/auth/RegisterTest';
 
 export default function App() {
   return (
@@ -9,6 +10,7 @@ export default function App() {
       </nav>
       <Routes>
         <Route path="/example" element={<ExamplePage />} />
+        <Route path="/register" element={<RegisterTest/>}/>
       </Routes>
     </BrowserRouter>
   );
