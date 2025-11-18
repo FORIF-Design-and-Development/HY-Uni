@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import { createUser, findUserByEmail, findUserByStudentNumber, findUserByNickname } from '../../models/auth/auth.model';
+import { createUser, findUserByEmail, findUserByStudentNumber, findUserByNickname, updateLastLoginAt } from '../../models/auth/auth.model';
 import { findDepartmentById } from '../../models/auth/auth.department.model';
 
 export async function register(req: Request, res: Response, next: NextFunction) {
@@ -96,6 +96,56 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     return res.status(201).json({
       success: true,
       user: safeUser,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function login(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { email, password } = req.body;
+
+    //1. 입력값 검증
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '이메일과 비밀번호를 모두 입력해주세요.',
+      });
+    }
+
+    //2. 사용자 조회
+    const user = await findUserByEmail(email);
+    if (!user || !user.password) {
+      return res.status(401).json({
+        success: false,
+        message: '이메일 또는 비밀번호가 올바르지 않습니다.',
+      });
+    }
+
+    //3. 비밀번호 검증
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: '이메일 또는 비밀번호가 올바르지 않습니다.',
+      });
+    }
+
+    //4. 학과 정보 조회
+    const department = await findDepartmentById(user.department_id);
+
+    //5. 마지막 로그인 시간 업데이트
+    updateLastLoginAt(user.user_id).catch(() => {});
+
+    //6. 응답 (비밀번호 제거)
+    const { password: _, ...safeUser } = user;
+
+    //추후 여기서 accessToken / refreshToken 추가 예정
+    return res.json({
+      success: true,
+      user: safeUser,
+      department
     });
   } catch (err) {
     next(err);
