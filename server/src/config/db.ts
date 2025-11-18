@@ -1,6 +1,6 @@
-import mysql from 'mysql2/promise';
-import type { Pool, PoolOptions } from 'mysql2/promise';
 import dotenv from 'dotenv';
+import type { Pool, PoolOptions } from 'mysql2/promise';
+import mysql from 'mysql2/promise';
 
 dotenv.config();
 

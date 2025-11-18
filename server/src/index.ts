@@ -1,8 +1,10 @@
-import express from 'express';
 import dotenv from 'dotenv';
+import express from 'express';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
-import { notFound, errorHandler } from './middlewares/error';
+import { errorHandler, notFound } from './middlewares/error';
+import cafeteriaRoutes from './routes/campus/cafeteria.routes';
+import menuRoutes from './routes/campus/menu.routes';
 import communityRoutes from './routes/community/community.routes';
 import authRoutes from './routes/auth/auth.routes';
 import departmentRoutes from './routes/auth/department.routes';
@@ -42,5 +44,5 @@ app.use(errorHandler);
 })();
 
 app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`);
+    console.log(`Server listening on http://localhost:${port}`);
 });
