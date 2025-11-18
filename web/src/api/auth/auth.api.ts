@@ -1,4 +1,5 @@
 import { api } from "../axios";
+import type { Department } from "./department.api";
 
 export type RegisterPayload = {
   email: string;
@@ -29,12 +30,23 @@ export type User = {
   portal_user_id: string | null;
 };
 
-export type RegisterResponse = {
+export type AuthResponse = {
   success: boolean;
   user: User;
+  department?: Department | null;
 };
 
-export async function register(payload: RegisterPayload): Promise<RegisterResponse> {
-  const res = await api.post<RegisterResponse>('/auth/register', payload);
+export type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+export async function register(payload: RegisterPayload): Promise<AuthResponse> {
+  const res = await api.post<AuthResponse>('/auth/register', payload);
+  return res.data;
+}
+
+export async function login(payload: LoginPayload): Promise<AuthResponse> {
+  const res = await api.post<AuthResponse>('/auth/login', payload);
   return res.data;
 }

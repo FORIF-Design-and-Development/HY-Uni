@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import ExamplePage from './pages/ExamplePage';
 import RegisterTest from './pages/auth/RegisterTest';
+import LoginTest from './pages/auth/LoginTest';
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
       <Routes>
         <Route path="/example" element={<ExamplePage />} />
         <Route path="/register" element={<RegisterTest/>}/>
+        <Route path="/login" element={<LoginTest />}/>
       </Routes>
     </BrowserRouter>
   );
