@@ -88,6 +88,12 @@ export async function createUser(data: CreateUserInput): Promise<User> {
   return list[0] as User;
 }
 
+export async function findUserById(userId: number): Promise<User | null> {
+  const [rows] = await pool.query('SELECT * FROM user WHERE user_id = ?', [userId]);
+  const list = rows as User[];
+  return list[0] || null;
+}
+
 //마지막 로그인 시간 업데이트(로그인 성공시 호출용)
 export async function updateLastLoginAt(userId: number): Promise<void> {
   await pool.query('UPDATE user SET last_login_at = NOW() WHERE user_id = ?', [userId]);

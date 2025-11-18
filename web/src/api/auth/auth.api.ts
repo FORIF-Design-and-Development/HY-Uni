@@ -34,6 +34,7 @@ export type AuthResponse = {
   success: boolean;
   user: User;
   department?: Department | null;
+  accessToken: string;
 };
 
 export type LoginPayload = {
@@ -48,5 +49,10 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
 
 export async function login(payload: LoginPayload): Promise<AuthResponse> {
   const res = await api.post<AuthResponse>('/auth/login', payload);
+  return res.data;
+}
+
+export async function logout(): Promise<{ success: boolean }> {
+  const res = await api.post<{ success: boolean }>('/auth/logout');
   return res.data;
 }
