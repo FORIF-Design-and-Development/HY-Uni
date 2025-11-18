@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { login, LoginPayload, AuthResponse } from "../../api/auth/auth.api";
+import { useAuthStore } from "../../store/auth.store";
 
 export default function LoginTest() {
   const [form, setForm] = useState<LoginPayload>({
@@ -9,6 +10,8 @@ export default function LoginTest() {
 
   const [result, setResult] = useState<AuthResponse | null>(null);
   const [error, setError] = useState<string>("");
+
+  const { setAuth, clearAuth } = useAuthStore();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({
@@ -28,8 +31,17 @@ export default function LoginTest() {
 
     try {
       const res = await login(form);
+
+      setAuth({
+        user: res.user,
+        department: res.department ?? null,
+        accessToken: res.accessToken,
+      });
+
       setResult(res);
     } catch (err: any) {
+      clearAuth();
+
       if (err.response) {
         setError(`Error ${err.response.status}: ${err.response.data.message}`);
       } else {

@@ -1,8 +1,10 @@
 import dotenv from 'dotenv';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
 import { errorHandler, notFound } from './middlewares/error';
+
 import cafeteriaRoutes from './routes/campus/cafeteria.routes';
 import menuRoutes from './routes/campus/menu.routes';
 import communityRoutes from './routes/community/community.routes';
@@ -16,6 +18,7 @@ const port = Number(process.env.PORT || 3000);
 
 app.use(corsMiddleware);
 app.use(express.json());
+app.use(cookieParser());
 
 //기본 라우트
 app.get('/', (_req, res) => {
@@ -24,6 +27,8 @@ app.get('/', (_req, res) => {
 
 //피쳐별 라우트 등록
 app.use('/api/community', communityRoutes);
+app.use('/api/cafeterias', cafeteriaRoutes);
+app.use('/api/menus', menuRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
 

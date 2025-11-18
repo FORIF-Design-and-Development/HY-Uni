@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import { createUser, findUserByEmail, findUserByStudentNumber, findUserByNickname, updateLastLoginAt } from '../../models/auth/auth.model';
+import { createUser, findUserByEmail, findUserByStudentNumber, findUserByNickname, findUserById, updateLastLoginAt } from '../../models/auth/auth.model';
 import { findDepartmentById } from '../../models/auth/auth.department.model';
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../config/jwt';
+
+const isProd = process.env.NODE_ENV === 'production';
 
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
@@ -93,9 +96,14 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     //5. 응답(민감 정보 제거)
     const { password: _, ...safeUser } = user;
 
+    const accessToken = signAccessToken(user.user_id);
+    const refreshToken = signRefreshToken(user.user_id);
+    setRefreshTokenCookie(res, refreshToken);
+
     return res.status(201).json({
       success: true,
       user: safeUser,
+      accessToken
     });
   } catch (err) {
     next(err);
@@ -141,13 +149,83 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     //6. 응답 (비밀번호 제거)
     const { password: _, ...safeUser } = user;
 
-    //추후 여기서 accessToken / refreshToken 추가 예정
+    const accessToken = signAccessToken(user.user_id);
+    const refreshToken = signRefreshToken(user.user_id);
+    setRefreshTokenCookie(res, refreshToken);
+
     return res.json({
       success: true,
       user: safeUser,
-      department
+      department,
+      accessToken
     });
   } catch (err) {
     next(err);
   }
+}
+
+function setRefreshTokenCookie(res: Response, token: string) {
+  res.cookie('refreshToken', token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    path: '/',
+  });
+}
+
+export async function refresh(req: Request, res: Response, next: NextFunction) {
+  try {
+    const token = req.cookies?.refreshToken;
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: '리프레시 토큰이 없습니다.',
+      });
+    }
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(token);
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        message: '유효하지 않은 리프레시 토큰입니다.',
+      });
+    }
+
+    const user = await findUserById(payload.userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: '해당 사용자를 찾을 수 없습니다.',
+      });
+    }
+
+    const department = await findDepartmentById(user.department_id);
+    const { password: _, ...safeUser } = user;
+
+    const newAccessToken = signAccessToken(user.user_id);
+
+    return res.json({
+      success: true,
+      user: safeUser,
+      department,
+      accessToken: newAccessToken,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function logout(req: Request, res: Response, _next: NextFunction) {
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    path: '/',
+  });
+
+  return res.json({
+    success: true,
+  });
 }
