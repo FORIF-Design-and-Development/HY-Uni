@@ -1,7 +1,8 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '../store/auth.store';
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { useAuthStore } from "../store/auth.store";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const baseURL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
 //공용 axios 인스턴스
 export const api = axios.create({
