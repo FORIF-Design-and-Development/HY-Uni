@@ -15,6 +15,11 @@ const port = Number(process.env.PORT || 3000);
 app.use(corsMiddleware);
 app.use(express.json());
 
+//기본 라우트
+app.get('/', (_req, res) => {
+  res.json({ ok: true });
+});
+
 // 커뮤니티 라우터 등록
 app.use('/api/community', communityRoutes);
 
@@ -24,11 +29,6 @@ app.use('/api/menus', menuRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
-
-//기본 라우트
-app.get('/', (_req, res) => {
-  res.json({ ok: true });
-});
 
 //DB 연결 테스트
 (async () => {
