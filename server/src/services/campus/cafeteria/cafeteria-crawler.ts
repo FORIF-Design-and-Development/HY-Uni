@@ -147,15 +147,40 @@ export class HanyangCrawler {
             
             const spicy = $el.find('.spicy, [data-spicy]').attr('data-spicy') || '-';
             
+            // 이미지 URL 추출
             let imageUrl = '';
-            const thumbImg = $el.find('.thumb-img, [class*="thumb"]').attr('style');
-            if (thumbImg) {
-                const match = thumbImg.match(/url\(([^)]+)\)/);
+            
+            // 방법 1: span.thumb-img의 background-image에서 추출
+            const thumbImgSpan = $el.find('span.thumb-img').attr('style');
+            if (thumbImgSpan) {
+                const match = thumbImgSpan.match(/url\(([^)]+)\)/);
                 if (match) {
-                    imageUrl = match[1].replace(/['"]/g, '');
+                    imageUrl = match[1].replace(/['"]/g, '').trim();
                     if (imageUrl.startsWith('/')) {
                         imageUrl = this.baseUrl + imageUrl;
                     }
+                }
+            }
+            
+            // 방법 2: .thumb 클래스의 style 속성 (fallback)
+            if (!imageUrl) {
+                const thumbImg = $el.find('.thumb, [class*="thumb"]').attr('style');
+                if (thumbImg) {
+                    const match = thumbImg.match(/url\(([^)]+)\)/);
+                    if (match) {
+                        imageUrl = match[1].replace(/['"]/g, '').trim();
+                        if (imageUrl.startsWith('/')) {
+                            imageUrl = this.baseUrl + imageUrl;
+                        }
+                    }
+                }
+            }
+            
+            // 방법 3: img 태그 직접 찾기 (fallback)
+            if (!imageUrl) {
+                const imgSrc = $el.find('img').attr('src');
+                if (imgSrc) {
+                    imageUrl = imgSrc.startsWith('/') ? this.baseUrl + imgSrc : imgSrc;
                 }
             }
 
