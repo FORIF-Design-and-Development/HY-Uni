@@ -7,6 +7,8 @@ import { errorHandler, notFound } from './middlewares/error';
 
 import cafeteriaRoutes from './routes/campus/cafeteria.routes';
 import menuRoutes from './routes/campus/menu.routes';
+import { noticeRoutes } from "./routes/campus/notice.routes";
+import { placeRoutes } from "./routes/campus/place.routes";
 import communityRoutes from './routes/community/community.routes';
 import authRoutes from './routes/auth/auth.routes';
 import departmentRoutes from './routes/auth/department.routes';
@@ -29,6 +31,8 @@ app.get('/', (_req, res) => {
 app.use('/api/community', communityRoutes);
 app.use('/api/cafeterias', cafeteriaRoutes);
 app.use('/api/menus', menuRoutes);
+app.use("/api/notices", noticeRoutes);
+app.use("/api/places", placeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
 
@@ -40,14 +44,14 @@ app.use(errorHandler);
 (async () => {
   try {
     const conn = await pool.getConnection();
-    console.log('MySQL 연결 성공');
+    console.log("MySQL 연결 성공");
     conn.release();
   } catch (err) {
-    console.error('MySQL 연결 실패:', (err as Error).message);
+    console.error("MySQL 연결 실패:", (err as Error).message);
     process.exit(1);
   }
 })();
 
 app.listen(port, () => {
-    console.log(`Server listening on http://localhost:${port}`);
+  console.log(`Server listening on http://localhost:${port}`);
 });
