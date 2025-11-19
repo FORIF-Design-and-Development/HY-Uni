@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
 import { pool } from '../../config/db';
+import type {
+    CafeteriaWithMenus,
+    MenuResponse,
+    TodayMenusResponse
+} from '../../models/campus/cafeteria.model';
 import type { Cafeteria, MenuItem } from '../../services/campus/cafeteria/cafeteria-crawler';
 import { cafeteriaCrawlerService } from '../../services/campus/cafeteria/crawler.service';
 
@@ -220,7 +225,7 @@ export class CafeteriaController {
             const [menuRows] = await pool.execute(query, params) as any[];
             
             // 3. 데이터 구조화
-            const cafeteriaMap = new Map();
+            const cafeteriaMap = new Map<number, CafeteriaWithMenus>();
             
             if (Array.isArray(menuRows)) {
                 menuRows.forEach((row: any) => {
@@ -234,8 +239,8 @@ export class CafeteriaController {
                         });
                     }
                     
-                    const cafe = cafeteriaMap.get(row.cafeteria_id);
-                    const menuItem = {
+                    const cafe = cafeteriaMap.get(row.cafeteria_id)!;
+                    const menuItem: MenuResponse = {
                         menu_id: row.menu_id,
                         description: row.description,
                         price: row.price,
@@ -248,11 +253,13 @@ export class CafeteriaController {
                 });
             }
             
+            const response: TodayMenusResponse = {
+                date: today,
+                cafeterias: Array.from(cafeteriaMap.values())
+            };
+            
             res.json({
-                data: {
-                    date: today,
-                    cafeterias: Array.from(cafeteriaMap.values())
-                },
+                data: response,
                 error: null,
                 meta: null
             });
