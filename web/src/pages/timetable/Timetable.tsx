@@ -113,7 +113,7 @@ function Timetable(): JSX.Element {
   // ====== 세트 불러오기 ======
   const loadSets = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/timetable-sets`);
+      const res = await axios.get(`${API_BASE}/timetablesets`);
       const data = (res.data && res.data.data) || [];
       setSets(data);
 
@@ -131,7 +131,7 @@ function Timetable(): JSX.Element {
     if (!name || !name.trim()) return;
 
     try {
-      await axios.post(`${API_BASE}/timetable-sets`, { name: name.trim() });
+      await axios.post(`${API_BASE}/timetablesets`, { name: name.trim() });
       await loadSets();
       window.alert("새 시간표 세트가 생성되었습니다.");
     } catch (err) {
@@ -154,7 +154,7 @@ function Timetable(): JSX.Element {
     if (!window.confirm(`'${target.name}' 세트를 삭제할까요?`)) return;
 
     try {
-      await axios.delete(`${API_BASE}/timetable-sets/${selectedSet}`);
+      await axios.delete(`${API_BASE}/timetablesets/${selectedSet}`);
       setSelectedCourses([]);
       setIncompleteCourses([]);
 
