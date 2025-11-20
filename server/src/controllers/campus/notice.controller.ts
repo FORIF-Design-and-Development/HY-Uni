@@ -123,3 +123,21 @@ export const deleteNotice = async (
     next(error);
   }
 };
+
+import cron from "node-cron";
+import { crawlAndSaveNotices } from "../../services/campus/notice/crawler.service";
+
+/**
+ * 스케줄러 초기화 함수
+ * 서버 실행 시(index.ts) 한 번 호출해주면 됩니다.
+ */
+export const initNoticeScheduler = () => {
+  // Cron 표현식: "0 * * * *" -> 매시 0분마다 실행 (1시간 간격)
+  // 테스트용: "*/10 * * * * *" -> 10초마다 실행
+  cron.schedule("0 * * * *", async () => {
+    console.log("⏰ 정기 크롤링 작업 시작");
+    await crawlAndSaveNotices();
+  });
+
+  console.log("🚀 공지사항 크롤러 스케줄러가 등록되었습니다.");
+};

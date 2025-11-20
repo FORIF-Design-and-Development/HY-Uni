@@ -1,21 +1,21 @@
-import dotenv from 'dotenv';
-import express from 'express';
-import cookieParser from 'cookie-parser';
-import { pool } from './config/db';
-import { corsMiddleware } from './middlewares/cors';
-import { errorHandler, notFound } from './middlewares/error';
+import dotenv from "dotenv";
+import express from "express";
+import cookieParser from "cookie-parser";
+import { pool } from "./config/db";
+import { corsMiddleware } from "./middlewares/cors";
+import { errorHandler, notFound } from "./middlewares/error";
 
-import cafeteriaRoutes from './routes/campus/cafeteria.routes';
-import menuRoutes from './routes/campus/menu.routes';
+import cafeteriaRoutes from "./routes/campus/cafeteria.routes";
+import menuRoutes from "./routes/campus/menu.routes";
 import { noticeRoutes } from "./routes/campus/notice.routes";
 import { placeRoutes } from "./routes/campus/place.routes";
-import communityRoutes from './routes/community/community.routes';
-import authRoutes from './routes/auth/auth.routes';
-import departmentRoutes from './routes/auth/department.routes';
-import coursesRouter from './routes/timetable/courses';
-import timetableRouter from './routes/timetable/timetable';
-import timetableSetsRouter from './routes/timetable/timetablesets';
-
+import communityRoutes from "./routes/community/community.routes";
+import authRoutes from "./routes/auth/auth.routes";
+import departmentRoutes from "./routes/auth/department.routes";
+import coursesRouter from "./routes/timetable/courses";
+import timetableRouter from "./routes/timetable/timetable";
+import timetableSetsRouter from "./routes/timetable/timetablesets";
+import { initNoticeScheduler } from "./controllers/campus/notice.controller";
 dotenv.config();
 
 const app = express();
@@ -26,21 +26,21 @@ app.use(express.json());
 app.use(cookieParser());
 
 //기본 라우트
-app.get('/', (_req, res) => {
+app.get("/", (_req, res) => {
   res.json({ ok: true });
 });
 
 //피쳐별 라우트 등록
-app.use('/api/community', communityRoutes);
-app.use('/api/cafeterias', cafeteriaRoutes);
-app.use('/api/menus', menuRoutes);
+app.use("/api/community", communityRoutes);
+app.use("/api/cafeterias", cafeteriaRoutes);
+app.use("/api/menus", menuRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/places", placeRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/departments', departmentRoutes);
-app.use('/api/courses', coursesRouter);
-app.use('/api/timetable', timetableRouter);
-app.use('/api/timetablesets', timetableSetsRouter);
+app.use("/api/auth", authRoutes);
+app.use("/api/departments", departmentRoutes);
+app.use("/api/courses", coursesRouter);
+app.use("/api/timetable", timetableRouter);
+app.use("/api/timetablesets", timetableSetsRouter);
 
 //404, 에러 핸들러
 app.use(notFound);
@@ -60,4 +60,6 @@ app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
+
+  initNoticeScheduler();
 });

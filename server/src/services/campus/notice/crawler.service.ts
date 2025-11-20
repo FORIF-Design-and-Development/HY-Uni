@@ -42,7 +42,7 @@ export const crawlAndSaveNotices = async () => {
     let totalSaved = 0;
 
     // 3. 페이지 순회 (4번 버튼부터 8번 버튼까지)
-    for (let i = 4; i < 9; i++) {
+    for (let i = 0; i < 9; i++) {
       console.log(`\n📄 [페이지 스캔] Pagination 인덱스: ${i}`);
 
       // (1) 로딩 대기 (3초)
