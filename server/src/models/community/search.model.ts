@@ -1,0 +1,234 @@
+import type { RowDataPacket } from 'mysql2/promise';
+import { pool } from '../../config/db';
+
+// DB 테이블 이름 상수
+const POSTS_TABLE = 'post';
+const BOARDS_TABLE = 'board';
+const USERS_TABLE = 'user';
+const TAGS_TABLE = 'tag';
+const POST_TAGS_TABLE = 'post_tag';
+const ATTACHMENTS_TABLE = 'attachment';
+
+// 검색 옵션
+export type SortBy = 'relevance' | 'latest' | 'likes';
+
+export interface SearchOptions {
+  query: string;
+  page: number;
+  pageSize: number;
+  sortBy: SortBy;
+  boardId?: number;
+}
+
+// 검색 결과 Row 타입
+interface SearchResultRow extends RowDataPacket {
+  post_id: number;
+  title: string;
+  content: string;
+  is_anonymous: 0 | 1;
+  like_count: number;
+  comment_count: number;
+  view_count: number;
+  created_at: Date;
+  board_id: number | null;
+  board_name: string | null;
+  user_id: number | null;
+  user_nickname: string | null;
+  tag_ids: string | null; // GROUP_CONCAT 결과
+  tag_names: string | null; // GROUP_CONCAT 결과
+  image_url: string | null;
+  video_url: string | null;
+}
+
+// 검색 결과 타입
+export interface SearchResult {
+  id: number;
+  title: string;
+  contentSnippet: string;
+  board: {
+    id: number;
+    name: string;
+  } | null;
+  counts: {
+    likes: number;
+    comments: number;
+    views: number;
+  };
+  createdAt: string;
+  author: {
+    nickname: string;
+  };
+  tags: Array<{
+    id: number;
+    name: string;
+  }>;
+  previews: {
+    imageUrl: string | null;
+    videoUrl: string | null;
+  };
+}
+
+// 검색 응답 타입
+export interface SearchResponse {
+  results: SearchResult[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+  };
+}
+
+// content의 처음 200자를 추출하는 함수
+// TODO: 얼마나 잘라야 하는지 결정해야 함
+function extractContentSnippet(content: string): string {
+  if (!content) return '';
+  return content.length > 200 ? content.substring(0, 200) : content;
+}
+
+// tag_ids와 tag_names 문자열을 파싱하여 배열로 변환
+function parseTags(tagIds: string | null, tagNames: string | null): Array<{ id: number; name: string }> {
+  if (!tagIds || !tagNames) return [];
+  
+  const ids = tagIds.split(',').map(id => Number.parseInt(id.trim(), 10));
+  const names = tagNames.split(',');
+  
+  return ids.map((id, index) => ({
+    id,
+    name: names[index]?.trim() || '',
+  })).filter(tag => tag.id && tag.name);
+}
+
+// Row를 SearchResult로 변환
+function toSearchResult(row: SearchResultRow): SearchResult {
+  return {
+    id: row.post_id,
+    title: row.title,
+    contentSnippet: extractContentSnippet(row.content),
+    board: row.board_id && row.board_name
+      ? {
+          id: row.board_id,
+          name: row.board_name,
+        }
+      : null,
+    counts: {
+      likes: row.like_count,
+      comments: row.comment_count,
+      views: row.view_count,
+    },
+    createdAt: new Date(row.created_at).toISOString(),
+    author: {
+      nickname: row.is_anonymous ? '익명' : (row.user_nickname || '익명'),
+    },
+    tags: parseTags(row.tag_ids, row.tag_names),
+    previews: {
+      imageUrl: row.image_url || null,
+      videoUrl: row.video_url || null,
+    },
+  };
+}
+
+// 게시글 검색 함수
+export async function searchPosts(options: SearchOptions): Promise<SearchResponse> {
+  const { query, page, pageSize, sortBy, boardId } = options;
+  const offset = (page - 1) * pageSize;
+  const searchTerm = `%${query}%`;
+
+  // 정렬 조건 생성
+  let orderBy = '';
+  if (sortBy === 'relevance') {
+    // 제목에 검색어 포함 우선, 그 다음 내용 포함
+    // TODO: 정렬(관련도) 조건 변경 가능
+    orderBy = `
+      ORDER BY
+        CASE WHEN p.title LIKE ? THEN 1 ELSE 2 END,
+        p.created_at DESC
+    `;
+  } else if (sortBy === 'likes') {
+    orderBy = 'ORDER BY p.like_count DESC, p.created_at DESC';
+  } else {
+    // latest (default)
+    orderBy = 'ORDER BY p.created_at DESC';
+  }
+
+  // boardId 필터 조건
+  const boardFilter = boardId ? 'AND p.board_id = ?' : '';
+
+  // 메인 검색 쿼리
+  const sql = `
+    SELECT
+      p.post_id,
+      p.title,
+      p.content,
+      p.is_anonymous,
+      p.like_count,
+      p.comment_count,
+      p.view_count,
+      p.created_at,
+      b.board_id,
+      b.name AS board_name,
+      u.user_id,
+      u.nickname AS user_nickname,
+      GROUP_CONCAT(DISTINCT t.tag_id ORDER BY t.tag_id) AS tag_ids,
+      GROUP_CONCAT(DISTINCT t.name ORDER BY t.tag_id) AS tag_names,
+      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'image' LIMIT 1) AS image_url,
+      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url
+    FROM ${POSTS_TABLE} AS p
+    LEFT JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
+    LEFT JOIN ${USERS_TABLE} AS u ON p.user_id = u.user_id
+    LEFT JOIN ${POST_TAGS_TABLE} AS pt ON p.post_id = pt.post_id
+    LEFT JOIN ${TAGS_TABLE} AS t ON pt.tag_id = t.tag_id
+    WHERE p.status = 'published'
+      AND (p.title LIKE ? OR p.content LIKE ?)
+      ${boardFilter}
+    GROUP BY p.post_id
+    ${orderBy}
+    LIMIT ? OFFSET ?
+  `;
+
+  // 쿼리 파라미터 구성
+  const params: any[] = [];
+  if (sortBy === 'relevance') {
+    params.push(searchTerm); // ORDER BY CASE의 LIKE 파라미터
+  }
+  params.push(searchTerm); // WHERE title LIKE
+  params.push(searchTerm); // WHERE content LIKE
+  if (boardId) {
+    params.push(boardId);
+  }
+  params.push(pageSize);
+  params.push(offset);
+
+  // 검색 결과 조회
+  const [rows] = await pool.query<SearchResultRow[]>(sql, params);
+  const results = rows.map(toSearchResult);
+
+  // 총 결과 수 계산
+  const countSql = `
+    SELECT COUNT(DISTINCT p.post_id) AS total
+    FROM ${POSTS_TABLE} AS p
+    WHERE p.status = 'published'
+      AND (p.title LIKE ? OR p.content LIKE ?)
+      ${boardFilter}
+  `;
+
+  const countParams: any[] = [searchTerm, searchTerm];
+  if (boardId) {
+    countParams.push(boardId);
+  }
+
+  const [countRows] = await pool.query<RowDataPacket[]>(countSql, countParams);
+  const totalResults = (countRows[0]?.total as number) || 0;
+  const totalPages = Math.ceil(totalResults / pageSize);
+
+  return {
+    results,
+    pagination: {
+      currentPage: page,
+      pageSize,
+      totalResults,
+      totalPages,
+    },
+  };
+}
+
