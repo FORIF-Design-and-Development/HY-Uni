@@ -68,3 +68,48 @@ export async function findPopularSearchRankings(
     rankings,
   };
 }
+
+// search_log에서 특정 기간의 검색어를 집계하여 popular_search에 저장하는 함수
+export async function aggregatePopularSearch(
+  baseTime: Date,
+  periodHours: number = 24,
+  limit: number = 10,
+): Promise<void> {
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    // 1. 동일 base_time의 기존 데이터 삭제 (중복 방지)
+    await connection.query(
+      `DELETE FROM ${POPULAR_SEARCH_TABLE} WHERE base_time = ?`,
+      [baseTime],
+    );
+
+    // 2. search_log에서 지난 periodHours 동안의 데이터 집계
+    const sql = `
+      INSERT INTO ${POPULAR_SEARCH_TABLE} (popular_rank, popular_query, count, base_time)
+      SELECT 
+        ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as popular_rank,
+        query as popular_query,
+        COUNT(*) as count,
+        ? as base_time
+      FROM search_log
+      WHERE created_at >= DATE_SUB(?, INTERVAL ? HOUR)
+      GROUP BY query
+      ORDER BY COUNT(*) DESC
+      LIMIT ?
+    `;
+
+    await connection.query(sql, [baseTime, baseTime, periodHours, limit]);
+
+    // 3. 트랜잭션 커밋
+    await connection.commit();
+  } catch (error) {
+    // 에러 발생 시 롤백
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}

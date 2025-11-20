@@ -1,21 +1,25 @@
-import dotenv from "dotenv";
-import express from "express";
-import cookieParser from "cookie-parser";
-import { pool } from "./config/db";
-import { corsMiddleware } from "./middlewares/cors";
-import { errorHandler, notFound } from "./middlewares/error";
+import cookieParser from 'cookie-parser';
+import dotenv from 'dotenv';
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import cron from 'node-cron';
+import { pool } from './config/db';
+import { corsMiddleware } from './middlewares/cors';
+import { errorHandler, notFound } from './middlewares/error';
+import { runAggregation } from './services/community/popular-search-aggregator.service';
 
-import cafeteriaRoutes from "./routes/campus/cafeteria.routes";
-import menuRoutes from "./routes/campus/menu.routes";
+import authRoutes from './routes/auth/auth.routes';
+import departmentRoutes from './routes/auth/department.routes';
+import cafeteriaRoutes from './routes/campus/cafeteria.routes';
+import menuRoutes from './routes/campus/menu.routes';
 import { noticeRoutes } from "./routes/campus/notice.routes";
 import { placeRoutes } from "./routes/campus/place.routes";
-import communityRoutes from "./routes/community/community.routes";
-import authRoutes from "./routes/auth/auth.routes";
-import departmentRoutes from "./routes/auth/department.routes";
-import coursesRouter from "./routes/timetable/courses";
-import timetableRouter from "./routes/timetable/timetable";
-import timetableSetsRouter from "./routes/timetable/timetablesets";
-import { initNoticeScheduler } from "./controllers/campus/notice.controller";
+import seatsRoutes from './routes/campus/seats.routes';
+import communityRoutes from './routes/community/community.routes';
+import coursesRouter from './routes/timetable/courses';
+import timetableRouter from './routes/timetable/timetable';
+import timetableSetsRouter from './routes/timetable/timetablesets';
+
 dotenv.config();
 
 const app = express();
@@ -31,9 +35,10 @@ app.get("/", (_req, res) => {
 });
 
 //피쳐별 라우트 등록
-app.use("/api/community", communityRoutes);
-app.use("/api/cafeterias", cafeteriaRoutes);
-app.use("/api/menus", menuRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/cafeterias', cafeteriaRoutes);
+app.use('/api/menus', menuRoutes);
+app.use('/api/seats', seatsRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/places", placeRoutes);
 app.use("/api/auth", authRoutes);
@@ -63,3 +68,23 @@ app.listen(port, () => {
 
   initNoticeScheduler();
 });
+
+// 인기 검색어 집계 스케줄러 설정
+const aggregateEnabled = process.env.POPULAR_SEARCH_AGGREGATE_ENABLED !== 'false';
+const aggregateCron = process.env.POPULAR_SEARCH_AGGREGATE_CRON || '0 * * * *'; // 매 시간 00분
+const aggregatePeriodHours = Number(process.env.POPULAR_SEARCH_AGGREGATE_PERIOD_HOURS || 24);
+const aggregateLimit = Number(process.env.POPULAR_SEARCH_AGGREGATE_LIMIT || 10);
+
+if (aggregateEnabled) {
+  cron.schedule(aggregateCron, async () => {
+    try {
+      const baseTime = new Date();
+      await runAggregation(baseTime, aggregatePeriodHours, aggregateLimit);
+    } catch (error) {
+      console.error('인기 검색어 집계 스케줄러 에러:', error);
+    }
+  });
+  console.log(
+    `인기 검색어 집계 스케줄러 시작 - cron: ${aggregateCron}, periodHours: ${aggregatePeriodHours}, limit: ${aggregateLimit}`,
+  );
+}
