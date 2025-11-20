@@ -1,13 +1,13 @@
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import express from 'express';
-import cookieParser from 'cookie-parser';
 import cron from 'node-cron';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
 import { errorHandler, notFound } from './middlewares/error';
 import { runAggregation } from './services/community/popular-search-aggregator.service';
 
+import { initNoticeScheduler } from './controllers/campus/notice.controller';
 import authRoutes from './routes/auth/auth.routes';
 import departmentRoutes from './routes/auth/department.routes';
 import cafeteriaRoutes from './routes/campus/cafeteria.routes';
