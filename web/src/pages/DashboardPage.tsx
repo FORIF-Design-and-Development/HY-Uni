@@ -23,7 +23,7 @@ export default function DashboardPage() {
         <p className="opacity-90 mb-6">오늘도 즐거운 캠퍼스 생활 되세요.</p>
         <div className="flex gap-3">
           <Link
-            to="/campus/notice"
+            to="/campus/notices"
             className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold hover:bg-indigo-50 transition"
           >
             공지사항 전체보기
