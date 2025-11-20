@@ -102,6 +102,7 @@ export async function findBoardsWithUserFlags(
     LEFT JOIN board_subscription AS bs
       ON bs.board_id = b.board_id
       AND bs.user_id = ?
+    WHERE b.parent_board_id IS NULL
     ORDER BY b.board_id ASC
   `;
 
