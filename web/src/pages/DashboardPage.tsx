@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNoticeStore } from "../store/useNoticeStore";
 // NoticeCard를 재사용합니다 (경로 확인 필요)
+import { LibrarySeatsWidget } from '../components/campus/LibrarySeatsWidget';
 import NoticeCard from "../components/campus/NoticeCard";
 
 export default function DashboardPage() {
@@ -90,6 +91,9 @@ export default function DashboardPage() {
               <p className="text-gray-400">등록된 공지사항이 없습니다.</p>
             </div>
           )}
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(350px,1fr))] gap-5">
+          <LibrarySeatsWidget />
         </div>
       </section>
     </div>
