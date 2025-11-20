@@ -1,17 +1,18 @@
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import express from 'express';
-import cookieParser from 'cookie-parser';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
 import { errorHandler, notFound } from './middlewares/error';
 
+import authRoutes from './routes/auth/auth.routes';
+import departmentRoutes from './routes/auth/department.routes';
 import cafeteriaRoutes from './routes/campus/cafeteria.routes';
 import menuRoutes from './routes/campus/menu.routes';
 import { noticeRoutes } from "./routes/campus/notice.routes";
 import { placeRoutes } from "./routes/campus/place.routes";
+import seatsRoutes from './routes/campus/seats.routes';
 import communityRoutes from './routes/community/community.routes';
-import authRoutes from './routes/auth/auth.routes';
-import departmentRoutes from './routes/auth/department.routes';
 import coursesRouter from './routes/timetable/courses';
 import timetableRouter from './routes/timetable/timetable';
 import timetableSetsRouter from './routes/timetable/timetablesets';
@@ -34,6 +35,7 @@ app.get('/', (_req, res) => {
 app.use('/api/community', communityRoutes);
 app.use('/api/cafeterias', cafeteriaRoutes);
 app.use('/api/menus', menuRoutes);
+app.use('/api/seats', seatsRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/places", placeRoutes);
 app.use('/api/auth', authRoutes);
