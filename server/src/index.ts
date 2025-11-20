@@ -30,7 +30,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 //기본 라우트
-app.get('/', (_req, res) => {
+app.get("/", (_req, res) => {
   res.json({ ok: true });
 });
 
@@ -41,11 +41,11 @@ app.use('/api/menus', menuRoutes);
 app.use('/api/seats', seatsRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/places", placeRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/departments', departmentRoutes);
-app.use('/api/courses', coursesRouter);
-app.use('/api/timetable', timetableRouter);
-app.use('/api/timetablesets', timetableSetsRouter);
+app.use("/api/auth", authRoutes);
+app.use("/api/departments", departmentRoutes);
+app.use("/api/courses", coursesRouter);
+app.use("/api/timetable", timetableRouter);
+app.use("/api/timetablesets", timetableSetsRouter);
 
 //404, 에러 핸들러
 app.use(notFound);
@@ -65,6 +65,8 @@ app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
+
+  initNoticeScheduler();
 });
 
 // 인기 검색어 집계 스케줄러 설정
