@@ -1,9 +1,11 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import cron from 'node-cron';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
 import { errorHandler, notFound } from './middlewares/error';
+import { runAggregation } from './services/community/popular-search-aggregator.service';
 
 import cafeteriaRoutes from './routes/campus/cafeteria.routes';
 import menuRoutes from './routes/campus/menu.routes';
@@ -61,3 +63,23 @@ app.use(errorHandler);
 app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
 });
+
+// 인기 검색어 집계 스케줄러 설정
+const aggregateEnabled = process.env.POPULAR_SEARCH_AGGREGATE_ENABLED !== 'false';
+const aggregateCron = process.env.POPULAR_SEARCH_AGGREGATE_CRON || '0 * * * *'; // 매 시간 00분
+const aggregatePeriodHours = Number(process.env.POPULAR_SEARCH_AGGREGATE_PERIOD_HOURS || 24);
+const aggregateLimit = Number(process.env.POPULAR_SEARCH_AGGREGATE_LIMIT || 10);
+
+if (aggregateEnabled) {
+  cron.schedule(aggregateCron, async () => {
+    try {
+      const baseTime = new Date();
+      await runAggregation(baseTime, aggregatePeriodHours, aggregateLimit);
+    } catch (error) {
+      console.error('인기 검색어 집계 스케줄러 에러:', error);
+    }
+  });
+  console.log(
+    `인기 검색어 집계 스케줄러 시작 - cron: ${aggregateCron}, periodHours: ${aggregatePeriodHours}, limit: ${aggregateLimit}`,
+  );
+}
