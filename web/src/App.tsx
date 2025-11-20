@@ -1,9 +1,15 @@
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+
 import { Dashboard } from './pages/Dashboard';
 import ExamplePage from './pages/ExamplePage';
-import LoginTest from './pages/auth/LoginTest';
-import RegisterTest from './pages/auth/RegisterTest';
-import Timetable from './pages/timetable/Timetable';
+
+
+import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
+import RegisterTest from "./pages/auth/RegisterTest";
+import LoginTest from "./pages/auth/LoginTest";
+import Timetable from "./pages/timetable/Timetable";
+import Layout from "./components/Layout";
+import DashboardPage from "./pages/DashboardPage";
+import NoticePage from "./pages/campus/NoticePage.tsx";
 
 export default function App() {
   return (
@@ -17,6 +23,9 @@ export default function App() {
         <Route path="/register" element={<RegisterTest/>}/>
         <Route path="/login" element={<LoginTest />}/>
         <Route path="/timetable" element={<Timetable />} />
+        <Route index element={<DashboardPage />} />
+        <Route path="/" element={<Navigate to="/campus/notice" replace />} />
+        <Route path="/campus/notices" element={<NoticePage />} />
       </Routes>
     </BrowserRouter>
   );

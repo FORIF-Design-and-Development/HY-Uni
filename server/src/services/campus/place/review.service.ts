@@ -10,7 +10,7 @@ import * as reviewRepository from "../../../models/campus/review.model";
 import * as placeRepository from "../../../models/campus/place.model";
 
 /**
- * 특정 장소의 모든 리뷰를 조회합니다.
+ * 특정 장소의 모든 리뷰를 조회
  */
 export const getReviewsForPlace = async (
   placeId: number
@@ -20,7 +20,7 @@ export const getReviewsForPlace = async (
 };
 
 /**
- * 특정 장소에 새 리뷰를 생성합니다.
+ * 특정 장소에 새 리뷰를 생성
  */
 export const createReviewForPlace = async (
   placeId: number,
