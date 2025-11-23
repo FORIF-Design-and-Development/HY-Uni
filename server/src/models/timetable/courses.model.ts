@@ -6,44 +6,50 @@ export const CoursesModel = {
 
     let sql = `
       SELECT
-        id,
-        교과목명,
-        교강사,
-        요일,
-        시작교시,
-        종료교시,
-        강의실,
-        학점,
-        이수구분,
-        학년
-      FROM \`2025_2\`
+       id,
+       course_code,
+       course_name,
+       course_name_eng,
+       professor_name,
+       major_division,
+       classification,
+       grade,
+       major_level, 
+       major_department,
+       offering_department,
+       day,
+       start_time,
+       end_time,
+       location,
+       credit
+      FROM course
     `;
 
     const conditions: string[] = [];
     const params: any[] = [];
 
     if (subject) {
-      conditions.push("교과목명 LIKE ?");
+      conditions.push("course_name LIKE ?");
       params.push(`%${subject}%`);
     }
 
     if (professor) {
-      conditions.push("교강사 LIKE ?");
+      conditions.push("professor_name LIKE ?");
       params.push(`%${professor}%`);
     }
 
     if (year) {
-      conditions.push("학년 = ?");
+      conditions.push("grade = ?");
       params.push(year);
     }
 
     if (type) {
-      conditions.push("이수구분 = ?");
+      conditions.push("major_division = ?");
       params.push(type);
     }
 
     if (day) {
-      conditions.push("요일 = ?");
+      conditions.push("day = ?");
       params.push(day);
     }
 
@@ -52,16 +58,16 @@ export const CoursesModel = {
     }
 
     if (sort === "학점순") {
-      sql += " ORDER BY 학점 DESC, 교과목명 ASC";
+      sql += " ORDER BY credit DESC, course_name ASC";
     } else if (sort === "요일순") {
       sql += `
         ORDER BY
-          FIELD(요일, '월','화','수','목','금','토'),
-          시작교시 ASC,
-          교과목명 ASC
+          FIELD(day, '월','화','수','목','금','토'),
+          start_time ASC,
+          course_name ASC
       `;
     } else {
-      sql += " ORDER BY 교과목명 ASC";
+      sql += " ORDER BY course_name ASC";
     }
 
     const [rows] = await pool.query(sql, params);

@@ -77,14 +77,14 @@ export default function TimetableGrid() {
               {days.map((day) => {
                 const startCourse = selectedCourses.find(
                   (c) =>
-                    c.요일 === day && Number(c.시작교시) === Number(t)
+                    c.day === day && Number(c.start_time) === Number(t)
                 );
 
                 const covered = selectedCourses.some(
                   (c) =>
-                    c.요일 === day &&
-                    Number(c.시작교시) < t &&
-                    Number(c.종료교시) >= t
+                    c.day === day &&
+                    Number(c.start_time) < t &&
+                    Number(c.end_time) >= t
                 );
 
                 if (covered) return null;
@@ -103,8 +103,8 @@ export default function TimetableGrid() {
                 }
 
                 const span =
-                  Number(startCourse.종료교시) -
-                  Number(startCourse.시작교시) +
+                  Number(startCourse.end_time) -
+                  Number(startCourse.start_time) +
                   1;
 
                 return (
@@ -122,7 +122,7 @@ export default function TimetableGrid() {
                   >
                     <button
                       onClick={() =>
-                        removeCourse(startCourse.id, startCourse.요일)
+                        removeCourse(startCourse.id, startCourse.day)
                       }
                       style={{
                         position: "absolute",
@@ -142,19 +142,19 @@ export default function TimetableGrid() {
                     </button>
 
                     <div style={{ fontWeight: 700, marginBottom: 2 }}>
-                      {startCourse.교과목명}
+                      {startCourse.course_name}
                     </div>
                     <div style={{ marginBottom: 2 }}>
-                      {startCourse.교강사 || "-"}
+                      {startCourse.professor_name || "-"}
                     </div>
 
                     <div style={{ fontSize: 10 }}>
-                      {startCourse.요일} {startCourse.시작교시}~
-                      {startCourse.종료교시}교시
+                      {startCourse.day} {startCourse.start_time}~
+                      {startCourse.end_time}교시
                       <br />
                       {periodToTimeRange(
-                        Number(startCourse.시작교시),
-                        Number(startCourse.종료교시)
+                        Number(startCourse.start_time),
+                        Number(startCourse.end_time)
                       )}
                     </div>
 
@@ -167,10 +167,10 @@ export default function TimetableGrid() {
                         fontSize: 10,
                       }}
                     >
-                      <div>{startCourse.강의실}</div>
+                      <div>{startCourse.location}</div>
                       <div>
-                        {startCourse.이수구분 || "이수구분 없음"} ·{" "}
-                        {startCourse.학점 ?? 0}학점
+                        {startCourse.major_division || "이수구분 없음"} ·{" "}
+                        {startCourse.credit ?? 0}학점
                       </div>
                     </div>
                   </td>
@@ -219,7 +219,7 @@ export default function TimetableGrid() {
                     }}
                     title="클릭하면 제거됩니다."
                   >
-                    {c.교과목명} ({c.교강사 || "-"})
+                    {c.course_name} ({c.professor_name || "-"})
                   </span>
                 ))}
               </div>

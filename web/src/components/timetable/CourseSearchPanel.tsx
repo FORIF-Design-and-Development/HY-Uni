@@ -208,29 +208,29 @@ export default function CourseSearchPanel() {
             .slice()
             .sort((a, b) => {
               if (filters.sort === "요일순") {
-                const da = DAY_ORDER[a.요일] || 99;
-                const db = DAY_ORDER[b.요일] || 99;
+                const da = DAY_ORDER[a.day] || 99;
+                const db = DAY_ORDER[b.day] || 99;
                 if (da !== db) return da - db;
-                return (a.시작교시 || 99) - (b.시작교시 || 99);
+                return (a.start_time || 99) - (b.start_time || 99);
               }
               return 0;
             })
             .map((c) => {
               const hasTime =
-                c.요일 && c.시작교시 != null && c.종료교시 != null;
+                c.day && c.start_time != null && c.end_time != null;
               const periodText = hasTime
-                ? `${c.요일} ${c.시작교시}~${c.종료교시}교시`
+                ? `${c.day} ${c.start_time}~${c.end_time}`
                 : "시간 미지정";
               const timeText = hasTime
                 ? periodToTimeRange(
-                    Number(c.시작교시),
-                    Number(c.종료교시)
+                    Number(c.start_time),
+                    Number(c.end_time)
                   )
                 : "";
 
               return (
                 <div
-                  key={`${c.id}-${c.요일 || "NO_DAY"}`}
+                  key={`${c.course_code}-${c.day}-${c.start_time || "X"}`}
                   style={{
                     border: "1px solid #ECEFF1",
                     borderRadius: 10,
@@ -250,14 +250,14 @@ export default function CourseSearchPanel() {
                       alignItems: "center",
                     }}
                   >
-                    <span>{c.교과목명}</span>
+                    <span>{c.course_name}</span>
                     <span
                       style={{
                         fontSize: 11,
                         color: "#898C8E",
                       }}
                     >
-                      {c.학점}학점 · {c.이수구분 || "이수구분 없음"}
+                      {c.credit}학점 · {c.major_division || "이수구분 없음"}
                     </span>
                   </div>
                   <div
@@ -267,7 +267,7 @@ export default function CourseSearchPanel() {
                       color: "#898C8E",
                     }}
                   >
-                    {c.교강사 || "-"} / {c.학년 || "학년 정보 없음"}
+                    {c.professor_name || "-"} / {c.grade || "학년 정보 없음"}
                   </div>
                   <div
                     style={{
@@ -278,7 +278,7 @@ export default function CourseSearchPanel() {
                   >
                     {periodText}
                     {timeText && ` · ${timeText}`}
-                    {c.강의실 && ` · ${c.강의실}`}
+                    {c.location && ` · ${c.location}`}
                   </div>
 
                   <button

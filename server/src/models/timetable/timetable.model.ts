@@ -10,14 +10,17 @@ export const TimetableModel = {
         t.day,
         t.start_period,
         t.end_period,
-        c.교과목명,
-        c.교강사,
-        c.강의실,
-        c.학점,
-        c.이수구분,
-        c.학년
+        c.course_name,
+        c.professor_name,
+        c.location,
+        c.credit,
+        c.major_division,
+        c.grade,
+        c.day AS course_day,
+        c.start_time,
+        c.end_time
       FROM timetable t
-      JOIN \`2025_2\` c ON t.course_id = c.id
+      JOIN course c ON t.course_id = c.id
       WHERE t.set_id = ?
       ORDER BY 
         FIELD(t.day, '월','화','수','목','금','토'),
