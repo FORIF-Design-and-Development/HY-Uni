@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { login, LoginPayload, AuthResponse } from "../../api/auth/auth.api";
 import { useAuthStore } from "../../store/auth.store";
+import { useNavigate } from "react-router-dom";
 
 export default function LoginTest() {
+  const navigate = useNavigate();
+
   const [form, setForm] = useState<LoginPayload>({
     email: "",
     password: "",
@@ -76,6 +79,12 @@ export default function LoginTest() {
 
         <button onClick={handleSubmit} style={{ marginTop: 10 }}>
           Login API 호출
+        </button>
+        <button onClick={() => navigate("/test/find-email")} style={{ marginTop: 20 }}>
+          이메일 찾기 테스트
+        </button>
+        <button onClick={() => navigate("/test/reset-password")}>
+          비밀번호 재설정 테스트
         </button>
       </div>
 
