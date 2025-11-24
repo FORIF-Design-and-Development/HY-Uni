@@ -3,7 +3,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LoginTest from "./pages/auth/LoginTest";
 import RegisterTest from "./pages/auth/RegisterTest";
 import NoticePage from "./pages/campus/NoticePage.tsx";
-import Timetable from "./pages/timetable/Timetable";
+import Timetable from "./pages/timetable/TimetablePage.tsx";
 
 export default function App() {
   return (

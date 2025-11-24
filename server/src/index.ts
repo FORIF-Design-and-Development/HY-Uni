@@ -16,9 +16,9 @@ import { noticeRoutes } from "./routes/campus/notice.routes";
 import { placeRoutes } from "./routes/campus/place.routes";
 import seatsRoutes from './routes/campus/seats.routes';
 import communityRoutes from './routes/community/community.routes';
-import coursesRouter from './routes/timetable/courses';
-import timetableRouter from './routes/timetable/timetable';
-import timetableSetsRouter from './routes/timetable/timetablesets';
+import coursesRoutes from "./routes/timetable/courses.routes";
+import timetableRoutes from "./routes/timetable/timetable.routes";
+import timetablesetsRoutes from "./routes/timetable/timetablesets.routes";
 
 dotenv.config();
 
@@ -43,9 +43,9 @@ app.use("/api/notices", noticeRoutes);
 app.use("/api/places", placeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/departments", departmentRoutes);
-app.use("/api/courses", coursesRouter);
-app.use("/api/timetable", timetableRouter);
-app.use("/api/timetablesets", timetableSetsRouter);
+app.use("/api/courses", coursesRoutes);
+app.use("/api/timetable", timetableRoutes);
+app.use("/api/timetablesets", timetablesetsRoutes);
 
 //404, 에러 핸들러
 app.use(notFound);
