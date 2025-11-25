@@ -1,4 +1,5 @@
 import { pool } from '../../config/db';
+import mysql from 'mysql2/promise';
 
 export type UserStatus = 'active' | 'inactive' | 'graduated' | 'leave';
 export type AuthProvider = 'local' | 'hanyang';
@@ -97,4 +98,68 @@ export async function findUserById(userId: number): Promise<User | null> {
 //마지막 로그인 시간 업데이트(로그인 성공시 호출용)
 export async function updateLastLoginAt(userId: number): Promise<void> {
   await pool.query('UPDATE user SET last_login_at = NOW() WHERE user_id = ?', [userId]);
+}
+
+export async function findUserByNameAndBirth(name: string, birth_date: string): Promise<User | null> {
+  const [rows] = await pool.query(
+    `SELECT * FROM user WHERE name = ? AND birth_date = ? LIMIT 1`,
+    [name, birth_date]
+  );
+
+  const list = rows as User[];
+  return list[0] || null;
+}
+
+export async function findUserForPasswordReset(name: string, birth_date: string, email: string): Promise<User | null> {
+  const [rows] = await pool.query(
+    `SELECT * FROM user
+     WHERE name = ? AND birth_date = ? AND email = ?
+     LIMIT 1`,
+    [name, birth_date, email]
+  );
+
+  const list = rows as User[];
+  return list[0] || null;
+}
+
+/*
+export async function updateUserPassword(userId: number, hashedPassword: string): Promise<void> {
+  await pool.query(
+    'UPDATE user SET password = ? WHERE user_id = ?',
+    [hashedPassword, userId]
+  );
+}
+*/
+
+export async function updateUserPassword(userId: number, hashedPassword: string): Promise<void> {
+  try {
+    //1차 시도: pool 사용
+    await pool.query(
+      'UPDATE user SET password = ? WHERE user_id = ?',
+      [hashedPassword, userId]
+    );
+  } catch (err: any) {
+    if (err.code !== 'ECONNRESET') {
+      throw err; //다른 에러면 그대로 위로 던짐
+    }
+
+    //2차 시도: 새 커넥션으로 우회
+    const conn = await mysql.createConnection({
+      host: process.env.DB_HOST as string,
+      port: Number(process.env.DB_PORT ?? 3306),
+      user: process.env.DB_USER as string,
+      password: process.env.DB_PASSWORD as string,
+      database: process.env.DB_NAME as string,
+      multipleStatements: false,
+    });
+
+    try {
+      await conn.execute(
+        'UPDATE user SET password = ? WHERE user_id = ?',
+        [hashedPassword, userId]
+      );
+    } finally {
+      await conn.end();
+    }
+  }
 }
