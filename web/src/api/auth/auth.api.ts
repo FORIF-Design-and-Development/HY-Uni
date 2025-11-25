@@ -56,3 +56,13 @@ export async function logout(): Promise<{ success: boolean }> {
   const res = await api.post<{ success: boolean }>('/auth/logout');
   return res.data;
 }
+
+export const findEmail = async (name: string, birth_date: string) => {
+  const res = await api.post('/auth/find-email', { name, birth_date });
+  return res.data;
+};
+
+export const resetPassword = async (name: string, birth_date: string, email: string) => {
+  const res = await api.post('/auth/reset-password', { name, birth_date, email });
+  return res.data;
+};

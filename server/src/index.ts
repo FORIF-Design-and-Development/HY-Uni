@@ -5,20 +5,10 @@ import cron from 'node-cron';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
 import { errorHandler, notFound } from './middlewares/error';
-import { runAggregation } from './services/community/popular-search-aggregator.service';
+import { registerRoutes } from './routes';
 
+import { runAggregation } from './services/community/popular-search-aggregator.service';
 import { initNoticeScheduler } from './controllers/campus/notice.controller';
-import authRoutes from './routes/auth/auth.routes';
-import departmentRoutes from './routes/auth/department.routes';
-import cafeteriaRoutes from './routes/campus/cafeteria.routes';
-import menuRoutes from './routes/campus/menu.routes';
-import { noticeRoutes } from "./routes/campus/notice.routes";
-import { placeRoutes } from "./routes/campus/place.routes";
-import seatsRoutes from './routes/campus/seats.routes';
-import communityRoutes from './routes/community/community.routes';
-import coursesRoutes from "./routes/timetable/courses.routes";
-import timetableRoutes from "./routes/timetable/timetable.routes";
-import timetablesetsRoutes from "./routes/timetable/timetablesets.routes";
 
 dotenv.config();
 
@@ -29,23 +19,7 @@ app.use(corsMiddleware);
 app.use(express.json());
 app.use(cookieParser());
 
-//기본 라우트
-app.get("/", (_req, res) => {
-  res.json({ ok: true });
-});
-
-//피쳐별 라우트 등록
-app.use('/api/community', communityRoutes);
-app.use('/api/cafeterias', cafeteriaRoutes);
-app.use('/api/menus', menuRoutes);
-app.use('/api/seats', seatsRoutes);
-app.use("/api/notices", noticeRoutes);
-app.use("/api/places", placeRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/departments", departmentRoutes);
-app.use("/api/courses", coursesRoutes);
-app.use("/api/timetable", timetableRoutes);
-app.use("/api/timetablesets", timetablesetsRoutes);
+registerRoutes(app);
 
 //404, 에러 핸들러
 app.use(notFound);
