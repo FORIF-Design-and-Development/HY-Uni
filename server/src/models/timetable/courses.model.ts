@@ -1,4 +1,4 @@
-import pool from "../../config/db";
+import { pool } from "../../config/db";
 
 export const CoursesModel = {
   getCourses: async (filters: any) => {
@@ -6,22 +6,23 @@ export const CoursesModel = {
 
     let sql = `
       SELECT
-       id,
+       course_id,
        course_code,
        course_name,
        course_name_eng,
-       professor_name,
+       professor,
        major_division,
        classification,
-       grade,
-       major_level, 
-       major_department,
-       offering_department,
-       day,
+       required_grade,
+       major_level,
        start_time,
        end_time,
+       day,
        location,
-       credit
+       credit,
+       department_id,
+       major_department,
+       offering_department
       FROM course
     `;
 
