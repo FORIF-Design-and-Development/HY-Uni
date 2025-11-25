@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { verifyAccessToken } from '../../config/jwt';
 import { findBoardById } from '../../models/community/board.model';
 import {
   findPreferredTagsByUserIdAndBoardId,
@@ -9,10 +10,6 @@ import {
   deletePreferredTags,
   findTagsByBoardId,
 } from '../../models/community/preferred-tag.model';
-
-interface RequestWithUser extends Request { // 요청 객체에 사용자 정보 추가
-  user?: { id?: number };
-}
 
 // 선호 태그 추가 요청 본문(바디) 데이터 필드 정의
 interface AddPreferredTagsBody {
@@ -34,9 +31,45 @@ export async function addPreferredTagsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // 사용자 ID 추출 (기존 패턴대로 하드코딩)
-    const { user } = req as RequestWithUser;
-    const userId = typeof user?.id === 'number' ? user.id : 2;
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
 
     // boardId 파라미터 검증
     const boardId = Number.parseInt(req.params.boardId ?? '', 10); // URL경로에서 boardId 정수로 변환
@@ -252,9 +285,45 @@ export async function deletePreferredTagsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // 사용자 ID 추출 (기존 패턴대로 하드코딩)
-    const { user } = req as RequestWithUser;
-    const userId = typeof user?.id === 'number' ? user.id : 2;
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
 
     // boardId 파라미터 검증
     const boardId = Number.parseInt(req.params.boardId ?? '', 10);
@@ -388,9 +457,45 @@ export async function getPreferredTagsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // 사용자 ID 추출 (기존 패턴대로 하드코딩)
-    const { user } = req as RequestWithUser;
-    const userId = typeof user?.id === 'number' ? user.id : 2;
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
 
     // boardId 파라미터 검증
     const boardId = Number.parseInt(req.params.boardId ?? '', 10);
@@ -426,7 +531,7 @@ export async function getPreferredTagsHandler(
 
     // 선호 태그 조회
     const preferredTags =
-      await findPreferredTagsByUserIdAndBoardId(userId, boardId); // 특정 게시판에 대한 사용자의의 선호 태그 id, 태그 이름 목록 조회
+      await findPreferredTagsByUserIdAndBoardId(userId, boardId); // 특정 게시판에 대한 사용자의 선호 태그 id, 태그 이름 목록 조회
 
     // 성공 응답
     res.status(200).json({
@@ -445,13 +550,52 @@ export async function getPreferredTagsHandler(
 }
 
 // 게시판별 사용 가능한 태그 목록 조회
-// - 특정 게시판에 사용 가능한 모든 해시태그 목록을 반환 (공개 API)
+// - 특정 게시판에 사용 가능한 모든 해시태그 목록을 반환
 export async function getBoardTagsHandler(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    try {
+      const payload = verifyAccessToken(token);
+      // userId는 여기서 사용되지 않지만, 인증 여부 확인을 위해 필요
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
     // boardId 파라미터 검증
     const boardId = Number.parseInt(req.params.boardId ?? '', 10);
     if (!Number.isInteger(boardId) || boardId <= 0) { // 게시판 ID가 정수가 아니거나 양수가 아닌 경우
