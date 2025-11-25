@@ -1,6 +1,8 @@
 import { api } from "../axios";
 import type { Department } from "./department.api";
 
+export type UserStatus = 'active' | 'inactive' | 'graduated' | 'leave';
+
 export type RegisterPayload = {
   email: string;
   password: string;
@@ -10,6 +12,8 @@ export type RegisterPayload = {
   phone_number: string;
   nickname: string;
   department_id: number;
+  grade: number;
+  status?: UserStatus;
 };
 
 export type User = {
@@ -22,6 +26,7 @@ export type User = {
   nickname: string;
   department_id: number;
   auth_provider: 'local' | 'hanyang';
+  grade: number;
   status: 'active' | 'inactive' | 'graduated' | 'leave';
   created_at: string;
   updated_at: string;
