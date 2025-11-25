@@ -1,13 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
+import { verifyAccessToken } from '../../config/jwt';
 import {
   addPreferredKeywords,
   findPreferredKeywordsByUserId,
   deletePreferredKeywords,
 } from '../../models/community/preferred-keyword.model';
-
-interface RequestWithUser extends Request { // 요청 객체에 사용자 정보 추가
-  user?: { id?: number };
-}
 
 interface UpdatePreferredKeywordsBody { // POST 요청 본문 데이터 필드 정의
   keywords?: unknown; // keywords: 선택적(?) 필드이고 타입은 unknown -> 나중에 배열 타입임이 확실해지면 배열 타입으로 변경
@@ -27,9 +24,45 @@ export async function updatePreferredKeywords(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // 사용자 ID 추출 (기존 패턴대로 하드코딩)
-    const { user } = req as RequestWithUser;
-    const userId = typeof user?.id === 'number' ? user.id : 2;
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
 
     // 요청 본문 체크
     if (!req.body || Object.keys(req.body).length === 0) {
@@ -196,9 +229,45 @@ export async function getPreferredKeywords(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // 사용자 ID 추출 (기존 패턴대로 하드코딩)
-    const { user } = req as RequestWithUser;
-    const userId = typeof user?.id === 'number' ? user.id : 2;
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
 
     // 사용자의 선호 키워드 조회
     const keywords = await findPreferredKeywordsByUserId(userId);
@@ -227,9 +296,45 @@ export async function deletePreferredKeywordsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // 사용자 ID 추출 (기존 패턴대로 하드코딩)
-    const { user } = req as RequestWithUser;
-    const userId = typeof user?.id === 'number' ? user.id : 2;
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
 
     // 요청 본문 체크
     if (!req.body || Object.keys(req.body).length === 0) {
