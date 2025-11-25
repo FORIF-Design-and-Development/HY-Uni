@@ -11,6 +11,7 @@ import { initNoticeScheduler } from './controllers/campus/notice.controller';
 import authRoutes from './routes/auth/auth.routes';
 import departmentRoutes from './routes/auth/department.routes';
 import cafeteriaRoutes from './routes/campus/cafeteria.routes';
+import calendarRoutes from './routes/campus/calendar.routes';
 import menuRoutes from './routes/campus/menu.routes';
 import { noticeRoutes } from "./routes/campus/notice.routes";
 import { placeRoutes } from "./routes/campus/place.routes";
@@ -46,6 +47,7 @@ app.use("/api/departments", departmentRoutes);
 app.use("/api/courses", coursesRoutes);
 app.use("/api/timetable", timetableRoutes);
 app.use("/api/timetablesets", timetablesetsRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 //404, 에러 핸들러
 app.use(notFound);
