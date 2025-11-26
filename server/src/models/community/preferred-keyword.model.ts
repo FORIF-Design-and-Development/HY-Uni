@@ -31,6 +31,12 @@ export interface PreferredKeyword {
   createdAt: Date;
 }
 
+// ID와 이름을 함께 반환하는 인터페이스
+export interface PreferredKeywordWithId {
+  id: number;
+  name: string;
+}
+
 // 키워드 이름으로 keyword_id를 찾거나 생성하는 함수
 async function findOrCreateKeywordId(
   connection: PoolConnection,
@@ -63,10 +69,10 @@ async function findOrCreateKeywordId(
   return result.insertId;
 }
 
-// 사용자의 선호 키워드 목록을 조회하는 함수
+// 사용자의 선호 키워드 목록을 조회하는 함수 (ID 포함)
 export async function findPreferredKeywordsByUserId(
   userId: number,
-): Promise<string[]> {
+): Promise<PreferredKeywordWithId[]> {
   const [rows] = await pool.query<UserKeywordWithNameRow[]>(
     `
       SELECT uk.user_id, uk.keyword_id, k.name
@@ -78,7 +84,10 @@ export async function findPreferredKeywordsByUserId(
     [userId],
   );
 
-  return rows.map((row) => row.name);
+  return rows.map((row) => ({
+    id: row.keyword_id,
+    name: row.name,
+  }));
 }
 
 // 사용자의 선호 키워드를 추가하는 함수 (기존 키워드 유지, 새 키워드만 추가)
@@ -176,6 +185,62 @@ export async function deletePreferredKeywords(
         `.trim(),
         [userId, ...keywordIds],
       );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+// ID로 키워드를 삭제하는 함수
+export async function deletePreferredKeywordsByIds(
+  userId: number,
+  keywordIds: number[],
+): Promise<void> {
+  if (keywordIds.length === 0) {
+    return;
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. USER_KEYWORD_TABLE에서 삭제
+    const idPlaceholders = keywordIds.map(() => '?').join(', ');
+    await connection.query(
+      `
+        DELETE FROM ${USER_KEYWORD_TABLE}
+        WHERE user_id = ? AND keyword_id IN (${idPlaceholders})
+      `.trim(),
+      [userId, ...keywordIds],
+    );
+
+    // 2. 각 keyword_id에 대해 다른 사용자가 사용 중인지 확인
+    for (const keywordId of keywordIds) {
+      const [remainingUsers] = await connection.query<UserKeywordRow[]>(
+        `
+          SELECT user_id, keyword_id
+          FROM ${USER_KEYWORD_TABLE}
+          WHERE keyword_id = ?
+          LIMIT 1
+        `.trim(),
+        [keywordId],
+      );
+
+      // 다른 사용자가 사용하지 않으면 keyword 테이블에서도 삭제
+      if (remainingUsers.length === 0) {
+        await connection.query(
+          `
+            DELETE FROM ${KEYWORD_TABLE}
+            WHERE keyword_id = ?
+          `.trim(),
+          [keywordId],
+        );
+      }
     }
 
     await connection.commit();

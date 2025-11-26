@@ -4,6 +4,7 @@ import {
   addPreferredKeywords,
   findPreferredKeywordsByUserId,
   deletePreferredKeywords,
+  deletePreferredKeywordsByIds,
 } from '../../models/community/preferred-keyword.model';
 
 interface UpdatePreferredKeywordsBody { // POST 요청 본문 데이터 필드 정의
@@ -11,7 +12,7 @@ interface UpdatePreferredKeywordsBody { // POST 요청 본문 데이터 필드 �
 }
 
 interface DeletePreferredKeywordsBody { // DELETE 요청 본문 데이터 필드 정의
-  keywords?: unknown; // keywords: 선택적(?) 필드이고 타입은 unknown -> 나중에 배열 타입임이 확실해지면 배열 타입으로 변경
+  keywordIds?: unknown; // keywordIds: 선택적(?) 필드이고 타입은 unknown -> 나중에 배열 타입임이 확실해지면 배열 타입으로 변경
 }
 
 // 선호 키워드 추가
@@ -167,7 +168,7 @@ export async function updatePreferredKeywords(
 
     // 새로 추가할 키워드만 필터링 (기존에 없는 키워드만)
     const newKeywords = uniqueKeywords.filter(
-      (keyword) => !existingKeywords.includes(keyword),
+      (keyword) => !existingKeywords.some((ek) => ek.name === keyword),
     );
 
     // 추가 후 총 개수 체크 (기존 + 새로운 키워드 합쳐서 최대 5개)
@@ -188,7 +189,7 @@ export async function updatePreferredKeywords(
       const savedKeywords = await findPreferredKeywordsByUserId(userId);
       res.status(200).json({
         data: {
-          userId: String(userId),
+          userId: userId,
           preferredKeywords: savedKeywords,
         },
         error: null,
@@ -208,7 +209,7 @@ export async function updatePreferredKeywords(
     // 성공 응답
     res.status(200).json({
       data: {
-        userId: String(userId),
+        userId: userId,
         preferredKeywords: savedKeywords,
       },
       error: null,
@@ -275,7 +276,7 @@ export async function getPreferredKeywords(
     // 성공 응답
     res.status(200).json({
       data: {
-        userId: String(userId),
+        userId: userId,
         preferredKeywords: keywords,
       },
       error: null,
@@ -351,63 +352,64 @@ export async function deletePreferredKeywordsHandler(
 
     const body = req.body as DeletePreferredKeywordsBody;
 
-    // keywords 필드 필수 체크
-    if (body.keywords === undefined || body.keywords === null) {
+    // keywordIds 필드 필수 체크
+    if (body.keywordIds === undefined || body.keywordIds === null) {
       res.status(400).json({
         data: null,
         error: {
-          message: 'keywords 필드는 필수입니다.',
-          code: 'MISSING_KEYWORDS_FIELD',
+          message: 'keywordIds 필드는 필수입니다.',
+          code: 'MISSING_KEYWORD_IDS_FIELD',
         },
         meta: null,
       });
       return;
     }
 
-    // keywords가 배열인지 체크
-    if (!Array.isArray(body.keywords)) {
+    // keywordIds가 배열인지 체크
+    if (!Array.isArray(body.keywordIds)) {
       res.status(400).json({
         data: null,
         error: {
-          message: 'keywords는 배열이어야 합니다.',
-          code: 'INVALID_KEYWORDS_TYPE',
+          message: 'keywordIds는 배열이어야 합니다.',
+          code: 'INVALID_KEYWORD_IDS_TYPE',
         },
         meta: null,
       });
       return;
     }
 
-    // 키워드 배열 처리: 앞뒤 공백 제거, 빈 문자열 필터링
-    const trimmedKeywords = (body.keywords as unknown[])
+    // 숫자 배열로 변환 및 유효성 검사
+    const keywordIds = (body.keywordIds as unknown[])
       .map((item) => {
-        if (typeof item !== 'string') {
-          return null;
+        if (typeof item === 'number') {
+          return item;
         }
-        return item.trim(); // 앞뒤 공백 제거
+        if (typeof item === 'string') {
+          const parsed = parseInt(item, 10);
+          return isNaN(parsed) ? null : parsed;
+        }
+        return null;
       })
-      .filter((item): item is string => item !== null && item !== ''); // null과 빈 문자열 제거
+      .filter((item): item is number => item !== null && item > 0);
 
-    // 중복 제거 (Set 사용)
-    const uniqueKeywords = Array.from(new Set(trimmedKeywords)); // 중복 제거 후 배열로 변환
-
-    // 삭제할 키워드가 없으면 성공 응답 반환
-    if (uniqueKeywords.length === 0) {
-      const savedKeywords = await findPreferredKeywordsByUserId(userId);
-      res.status(200).json({
-        data: {
-          userId: String(userId),
-          preferredKeywords: savedKeywords,
+    // 유효한 ID가 없으면 에러
+    if (keywordIds.length === 0) {
+      res.status(400).json({
+        data: null,
+        error: {
+          message: '유효한 keywordId가 필요합니다.',
+          code: 'INVALID_KEYWORD_IDS',
         },
-        error: null,
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
+        meta: null,
       });
       return;
     }
 
-    // 선택한 키워드 삭제
-    await deletePreferredKeywords(userId, uniqueKeywords);
+    // 중복 제거
+    const uniqueIds = Array.from(new Set(keywordIds));
+
+    // ID로 키워드 삭제
+    await deletePreferredKeywordsByIds(userId, uniqueIds);
 
     // 삭제 후 남은 키워드 조회
     const savedKeywords = await findPreferredKeywordsByUserId(userId);
@@ -415,7 +417,7 @@ export async function deletePreferredKeywordsHandler(
     // 성공 응답
     res.status(200).json({
       data: {
-        userId: String(userId),
+        userId: userId,
         preferredKeywords: savedKeywords,
       },
       error: null,

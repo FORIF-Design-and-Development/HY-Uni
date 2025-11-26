@@ -629,7 +629,8 @@ export async function getBoardTagsHandler(
     }
 
     // 게시판별 사용 가능한 태그 목록 조회
-    const availableTags = await findTagsByBoardId(boardId); // 특정 게시판에 사용 가능한 모든 태그 id, 태그 이름 목록 조회
+    const targetBoardId = board.parentBoardId ?? boardId; // 부모 게시판 ID가 있으면 부모 게시판 ID, 없으면 현재 게시판 ID
+    const availableTags = await findTagsByBoardId(targetBoardId); // 특정 게시판에 사용 가능한 모든 태그 id, 태그 이름 목록 조회
 
     // 성공 응답
     res.status(200).json({
