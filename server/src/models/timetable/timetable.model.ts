@@ -28,9 +28,6 @@ export const TimetableModel = {
       SELECT 
         t.timetable_id AS t_id,
         t.course_id,
-        t.day,
-        t.start_period,
-        t.end_period,
         c.course_name,
         c.professor AS professor_name,
         c.location,
@@ -44,8 +41,8 @@ export const TimetableModel = {
       JOIN course c ON t.course_id = c.course_id
       WHERE t.timetable_list_id = ?
       ORDER BY 
-        FIELD(t.day, '월','화','수','목','금','토'),
-        t.start_period ASC
+        FIELD(c.day, '월','화','수','목','금','토'),
+        c.start_time ASC
       `,
       [setId]
     );
@@ -66,8 +63,8 @@ export const TimetableModel = {
   ): Promise<void> => {
     await pool.query(
       `
-      INSERT INTO timetable (timetable_list_id, course_id, day, start_period, end_period)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO timetable (timetable_list_id, course_id)
+      VALUES (?, ?)
       `,
       [setId, courseId, day, start, end]
     );

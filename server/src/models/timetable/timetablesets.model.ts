@@ -14,20 +14,20 @@ export interface TimetableSetListResponse {
 }
 
 export const TimetableSetsModel = {
-  getAllSets: async (): Promise<TimetableSet[]> => {
+  getAllSets: async (): Promise<any[]> => {
     const [rows] = await pool.query(
       `SELECT 
-        timetable_list_id AS set_id, 
-        timetable_name AS name
+        timetable_list_id AS timetable_list_id,
+        timetable_name AS timetable_name
       FROM timetable_list
       ORDER BY timetable_list_id`
     );
-    return rows as TimetableSet[];
+    return rows as any[];
   },
 
   createSet: async (name: string): Promise<void> => {
     await pool.query(
-      "INSERT INTO timetable_list (timetable_name, user_id) VALUES (?, 1)",
+      "INSERT INTO timetable_list (timetable_name, user_id) VALUES (?, 2)",
       [name]
     );
   },

@@ -63,10 +63,11 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
     set({ sets: data });
 
     if (data.length > 0 && !get().selectedSet) {
-      set({ selectedSet: data[0].set_id });
-      await get().loadTimetable(data[0].set_id);
+      set({ selectedSet: data[0].timetable_list_id });
+      await get().loadTimetable(data[0].timetable_list_id);
     }
   },
+
 
   createSet: async () => {
     const name = window.prompt("새 시간표 이름을 입력하세요");

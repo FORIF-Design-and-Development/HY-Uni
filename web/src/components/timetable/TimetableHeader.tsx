@@ -5,7 +5,7 @@ export default function TimetableHeader() {
     useTimetableStore();
 
   const currentSet =
-    sets.find((s) => s.set_id === selectedSet)?.name || "시간표 미선택";
+    sets.find((s) => s.timetable_list_id === selectedSet)?.timetable_name || "시간표 미선택";
 
   return (
     <div
@@ -40,8 +40,8 @@ export default function TimetableHeader() {
           }}
         >
           {sets.map((s) => (
-            <option key={s.set_id} value={s.set_id}>
-              {s.name}
+            <option key={s.timetable_list_id} value={s.timetable_list_id}>
+              {s.timetable_name}
             </option>
           ))}
         </select>
@@ -61,19 +61,20 @@ export default function TimetableHeader() {
           ➕ 세트
         </button>
 
-        <button
-          onClick={deleteSet}
-          style={{
-            padding: "6px 10px",
-            borderRadius: 8,
-            border: "1px solid #ffffff",
-            backgroundColor: "transparent",
-            color: "#ffffff",
-            cursor: "pointer",
-          }}
-        >
-          🗑 삭제
-        </button>
+      <button
+        onClick={() => deleteSet(selectedSet)}
+        style={{
+          padding: "6px 10px",
+          borderRadius: 8,
+          border: "1px solid #ffffff",
+          backgroundColor: "transparent",
+          color: "#ffffff",
+          cursor: "pointer",
+        }}
+      >
+        🗑 삭제
+      </button>
+
 
         <button
           onClick={saveTimetable}

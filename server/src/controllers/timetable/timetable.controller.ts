@@ -20,12 +20,12 @@ export const resetTimetable = async (req: Request, res: Response, next: NextFunc
   try {
     const setId = Number(req.query.setId);
 
-    if (!setId) {
+    if (setId == null) {
       return res.status(400).json({ error: "setId is required" });
     }
 
     await TimetableModel.deleteTimetableBySet(setId);
-    res.json({ success: true });
+    res.json({ success: true});
   } catch (err) {
     next(err);
   }
