@@ -73,6 +73,27 @@ export async function findPreferredTagsByUserIdAndBoardId(
   }));
 }
 
+// 사용자의 모든 선호 태그를 조회하는 함수 (게시판과 관계없이)
+export async function findAllPreferredTagsByUserId(
+  userId: number,
+): Promise<Array<{ id: number; name: string }>> {
+  const [rows] = await pool.query<PreferredTagWithNameRow[]>(
+    `
+      SELECT t.tag_id, t.name
+      FROM ${USER_PREFERENCE_TAG_TABLE} upt
+      INNER JOIN ${TAGS_TABLE} t ON upt.tag_id = t.tag_id
+      WHERE upt.user_id = ?
+      ORDER BY t.tag_id ASC
+    `.trim(),
+    [userId],
+  );
+
+  return rows.map((row) => ({
+    id: row.tag_id,
+    name: row.name,
+  }));
+}
+
 // 게시판별 사용 가능한 태그 목록 조회
 // board_tag와 tag를 JOIN하여 특정 게시판에 사용 가능한 모든 태그를 반환
 export async function findTagsByBoardId(

@@ -1476,7 +1476,7 @@ export async function findPostsByBoardId(
     let preferredTagConditions = '';
     const preferredTagParams: any[] = [];
     if (preferredTags.length > 0) {
-      const preferredTagIds = preferredTags.map((tag) => tag.id);
+      const preferredTagIds = preferredTags.map((tag: { id: number; name: string }) => tag.id);
       const placeholders = preferredTagIds.map(() => '?').join(', ');
       preferredTagConditions = `pt.tag_id IN (${placeholders})`;
       preferredTagParams.push(...preferredTagIds);
