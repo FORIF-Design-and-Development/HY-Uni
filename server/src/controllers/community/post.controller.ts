@@ -12,6 +12,9 @@ import {
   deletePostWithRelations,
   togglePostReaction,
   togglePostScrap,
+  votePostPoll,
+  findPostsByBoardId,
+  type BoardPostSortBy,
 } from '../../models/community/post.model';
 
 // 게시물 생성 요청 본문(바디) 데이터 필드 정의
@@ -1135,4 +1138,411 @@ export async function togglePostScrapHandler(
   }
 }
 
+// 게시글 투표
+// - 게시글 ID와 투표 옵션 ID를 받아서 투표를 처리하는 HTTP 핸들러
+export async function votePostPollHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 게시글 ID 파라미터 추출 및 검증
+    const postId = Number.parseInt(req.params.postId ?? '', 10);
+
+    if (!Number.isInteger(postId) || postId <= 0) {
+      res.status(400).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 게시글 ID입니다.',
+          code: 'INVALID_POST_ID',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 요청 본문 검증
+    if (!isRecord(req.body)) {
+      res.status(400).json({
+        data: null,
+        error: {
+          message: '요청 본문이 필요합니다.',
+          code: 'EMPTY_REQUEST_BODY',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    const body = req.body as { optionId?: unknown };
+    const optionId = body.optionId;
+
+    // optionId 필드 검증
+    if (optionId === undefined || optionId === null) {
+      res.status(400).json({
+        data: null,
+        error: {
+          message: '투표 옵션 ID(optionId)는 필수입니다.',
+          code: 'MISSING_FIELD',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    if (typeof optionId !== 'number' || !Number.isInteger(optionId) || optionId <= 0) {
+      res.status(400).json({
+        data: null,
+        error: {
+          message: '투표 옵션 ID(optionId)는 양수 정수여야 합니다.',
+          code: 'INVALID_REQUEST_BODY',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 모델 함수 호출
+    try {
+      const result = await votePostPoll(postId, userId, optionId);
+
+      // 게시글 투표 성공 시 200 응답
+      res.status(200).json({
+        data: {
+          pollId: result.pollId,
+          userVote: {
+            selectedOptionId: result.userVote.selectedOptionId,
+          },
+          results: result.results,
+        },
+        error: null,
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error: any) {
+      // 모델 레이어에서 발생한 에러 처리
+      if (error instanceof Error) {
+        if (error.message === 'POST_NOT_FOUND') {
+          res.status(404).json({
+            data: null,
+            error: {
+              message: '해당 ID의 게시글을 찾을 수 없습니다.',
+              code: 'POST_NOT_FOUND',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+
+        if (error.message === 'POLL_NOT_FOUND') {
+          res.status(404).json({
+            data: null,
+            error: {
+              message: '해당 게시글에 투표가 없습니다.',
+              code: 'POLL_NOT_FOUND',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+
+        if (error.message === 'POLL_EXPIRED') {
+          res.status(400).json({
+            data: null,
+            error: {
+              message: '만료된 투표에는 투표할 수 없습니다.',
+              code: 'POLL_EXPIRED',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+
+        if (error.message === 'ALREADY_VOTED') {
+          res.status(400).json({
+            data: null,
+            error: {
+              message: '이미 투표한 게시글입니다.',
+              code: 'ALREADY_VOTED',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+
+        if (error.message === 'INVALID_OPTION') {
+          res.status(400).json({
+            data: null,
+            error: {
+              message: '유효하지 않은 투표 옵션입니다.',
+              code: 'INVALID_OPTION',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+      }
+
+      throw error;
+    }
+  } catch (error) {
+    // 서버 오류 처리
+    // TODO: middleware로 refactoring
+    res.status(500).json({
+      data: null,
+      error: {
+        message: '게시글 투표 처리 중 오류가 발생했습니다.',
+        code: 'INTERNAL_ERROR',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+    next(error);
+  }
+}
+
+// 게시판별 게시글 목록 조회 핸들러
+export async function getBoardPostsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 게시판 ID 파라미터 추출 및 검증
+    const boardId = Number.parseInt(req.params.boardId ?? '', 10);
+
+    if (!Number.isInteger(boardId) || boardId <= 0) {
+      res.status(400).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 게시판 ID입니다.',
+          code: 'INVALID_BOARD_ID',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 페이지 파라미터 파싱
+    const pageParam = req.query.page;
+    let page = 1;
+    if (pageParam) {
+      const parsedPage = Number.parseInt(String(pageParam), 10);
+      if (Number.isInteger(parsedPage) && parsedPage >= 1) {
+        page = parsedPage;
+      } else {
+        res.status(400).json({
+          data: null,
+          error: {
+            message: '페이지 번호는 1 이상이어야 합니다.',
+            code: 'VALIDATION_ERROR',
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+    }
+
+    // 페이지 크기 파라미터 파싱
+    const pageSizeParam = req.query.pageSize;
+    let pageSize = 20;
+    if (pageSizeParam) {
+      const parsedPageSize = Number.parseInt(String(pageSizeParam), 10);
+      if (Number.isInteger(parsedPageSize) && parsedPageSize >= 1 && parsedPageSize <= 100) {
+        pageSize = parsedPageSize;
+      } else {
+        res.status(400).json({
+          data: null,
+          error: {
+            message: '페이지 크기는 1 이상 100 이하여야 합니다.',
+            code: 'VALIDATION_ERROR',
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+    }
+
+    // 정렬 기준 파라미터 파싱
+    const sortByParam = req.query.sortBy;
+    let sortBy: BoardPostSortBy = 'latest';
+    if (sortByParam) {
+      const sortByValue = String(sortByParam);
+      if (sortByValue === 'latest' || sortByValue === 'likes' || sortByValue === 'comments' || sortByValue === 'views') {
+        sortBy = sortByValue as BoardPostSortBy;
+      } else {
+        res.status(400).json({
+          data: null,
+          error: {
+            message: '정렬 기준은 latest, likes, comments, views 중 하나여야 합니다.',
+            code: 'VALIDATION_ERROR',
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+    }
+
+    // 모델 함수 호출
+    try {
+      const result = await findPostsByBoardId({
+        boardId,
+        page,
+        pageSize,
+        sortBy,
+        userId, // 필터 키워드 적용을 위해 userId 전달
+      });
+
+      // 성공 응답 반환
+      res.status(200).json({
+        data: result,
+        error: null,
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error: any) {
+      // 모델 레이어에서 발생한 에러 처리
+      if (error instanceof Error) {
+        if (error.message === 'BOARD_NOT_FOUND') {
+          res.status(404).json({
+            data: null,
+            error: {
+              message: '해당 ID의 게시판을 찾을 수 없습니다.',
+              code: 'BOARD_NOT_FOUND',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+      }
+
+      throw error;
+    }
+  } catch (error) {
+    // 서버 오류 처리
+    // TODO: middleware로 refactoring
+    res.status(500).json({
+      data: null,
+      error: {
+        message: '게시글 목록 조회 중 오류가 발생했습니다.',
+        code: 'INTERNAL_ERROR',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+    next(error);
+  }
+}
 
