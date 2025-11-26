@@ -1,7 +1,31 @@
 import { pool } from "../../config/db";
 
+export interface Course {
+  course_id: number;
+  course_code: string;
+  course_name: string;
+  course_name_eng: string | null;
+  professor: string | null;
+  major_division: string | null;
+  classification: string | null;
+  required_grade: number | null;
+  major_level: string | null;
+  start_time: number | null;
+  end_time: number | null;
+  day: string | null;
+  location: string | null;
+  credit: number | null;
+  department_id: number | null;
+  major_department: string | null;
+  offering_department: string | null;
+}
+
+export interface CourseListResponse {
+  courses: Course[];
+}
+
 export const CoursesModel = {
-  getCourses: async (filters: any) => {
+  getCourses: async (filters: any): Promise<Course[]> => {
     const { subject, professor, year, type, day, sort } = filters;
 
     let sql = `
@@ -35,12 +59,12 @@ export const CoursesModel = {
     }
 
     if (professor) {
-      conditions.push("professor_name LIKE ?");
+      conditions.push("professor LIKE ?");
       params.push(`%${professor}%`);
     }
 
     if (year) {
-      conditions.push("grade = ?");
+      conditions.push("required_grade = ?");
       params.push(year);
     }
 
@@ -72,6 +96,17 @@ export const CoursesModel = {
     }
 
     const [rows] = await pool.query(sql, params);
-    return rows;
+
+    const convertTimeToPeriod = (time: string | null) => {
+      if (!time) return null;
+      const [hour] = time.split(":").map(Number);
+      return hour - 8;
+    };
+
+    return (rows as any[]).map(row => ({
+      ...row,
+      start_time: convertTimeToPeriod(row.start_time),
+      end_time: convertTimeToPeriod(row.end_time),
+    })) as Course[];
   },
 };

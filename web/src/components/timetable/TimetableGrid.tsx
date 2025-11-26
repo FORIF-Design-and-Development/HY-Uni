@@ -1,28 +1,33 @@
-import React from "react";
 import { useTimetableStore } from "../../store/timetable.store";
 
 const periodToTimeRange = (start: number, end: number) => {
   const base = 9;
-  const s = base + (start - 1);
-  const e = base + (end - 1);
-  const toStr = (h: number) => `${String(h).padStart(2, "0")}:00`;
-  return `${toStr(s)} ~ ${toStr(e)}`;
+  const fmt = (h: number) => `${String(h).padStart(2, "0")}:00`;
+
+  const startTime = base + (start - 1);
+  const endTime = base + (end - 1);
+
+  return `${fmt(startTime)} ~ ${fmt(endTime)}`;
 };
 
 export default function TimetableGrid() {
-  const {
-    selectedCourses,
-    incompleteCourses,
-    removeCourse,
-    removeIncomplete,
-  } = useTimetableStore();
+  const { selectedCourses, removeCourse, removeIncomplete } =
+    useTimetableStore();
 
   const days = ["월", "화", "수", "목", "금", "토"];
   const times = Array.from({ length: 15 }, (_, i) => i + 1);
 
+  const validCourses = selectedCourses.filter(
+    (c) => c.start_time != null && c.end_time != null
+  );
+
+  const incomplete = selectedCourses.filter(
+    (c) => c.start_time == null || c.end_time == null
+  );
+
   const getColor = (id: number) => {
     const palette = ["#0E4A84", "#898C8E"];
-    return palette[id % 2]; // 간단한 색상 배정
+    return palette[id % 2];
   };
 
   return (
@@ -75,12 +80,12 @@ export default function TimetableGrid() {
               </td>
 
               {days.map((day) => {
-                const startCourse = selectedCourses.find(
+                const startCourse = validCourses.find(
                   (c) =>
                     c.day === day && Number(c.start_time) === Number(t)
                 );
 
-                const covered = selectedCourses.some(
+                const covered = validCourses.some(
                   (c) =>
                     c.day === day &&
                     Number(c.start_time) < t &&
@@ -92,7 +97,7 @@ export default function TimetableGrid() {
                 if (!startCourse) {
                   return (
                     <td
-                      key={day}
+                      key={`empty-${day}-${t}`}
                       style={{
                         border: "1px solid #ECEFF1",
                         backgroundColor: "#ffffff",
@@ -102,18 +107,19 @@ export default function TimetableGrid() {
                   );
                 }
 
-                const span =
-                  Number(startCourse.end_time) -
-                  Number(startCourse.start_time) +
-                  1;
+                const s = Number(startCourse.start_time);
+                const e = Number(startCourse.end_time);
+                const span = e - s + 1;
 
                 return (
                   <td
-                    key={day}
+                    key={`${day}-${startCourse.course_id}-${s}-${t}`}
                     rowSpan={span}
                     style={{
                       border: "1px solid #ECEFF1",
-                      backgroundColor: getColor(startCourse.id),
+                      backgroundColor: getColor(
+                        validCourses.indexOf(startCourse)
+                      ),
                       color: "#ffffff",
                       position: "relative",
                       padding: 6,
@@ -121,9 +127,16 @@ export default function TimetableGrid() {
                     }}
                   >
                     <button
-                      onClick={() =>
-                        removeCourse(startCourse.id, startCourse.day)
-                      }
+                      onClick={() => {
+                        if (!window.confirm("해당 강의를 삭제하시겠습니까?"))
+                          return;
+                        removeCourse(
+                          startCourse.course_id,
+                          startCourse.day,
+                          startCourse.start_time,
+                          startCourse.end_time
+                        );
+                      }}
                       style={{
                         position: "absolute",
                         top: 4,
@@ -136,26 +149,24 @@ export default function TimetableGrid() {
                         color: "#fff",
                         cursor: "pointer",
                         fontSize: 12,
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
-                      ×
+                      x
                     </button>
 
                     <div style={{ fontWeight: 700, marginBottom: 2 }}>
                       {startCourse.course_name}
                     </div>
                     <div style={{ marginBottom: 2 }}>
-                      {startCourse.professor_name || "-"}
+                      {startCourse.professor || "-"}
                     </div>
 
                     <div style={{ fontSize: 10 }}>
-                      {startCourse.day} {startCourse.start_time}~
-                      {startCourse.end_time}교시
+                      {startCourse.day} {s}~{e}교시
                       <br />
-                      {periodToTimeRange(
-                        Number(startCourse.start_time),
-                        Number(startCourse.end_time)
-                      )}
+                      {periodToTimeRange(s, e)}
                     </div>
 
                     <div
@@ -179,7 +190,6 @@ export default function TimetableGrid() {
             </tr>
           ))}
 
-          {/* ===== 미지정 강의 ===== */}
           <tr>
             <td
               colSpan={days.length + 1}
@@ -191,7 +201,6 @@ export default function TimetableGrid() {
               }}
             >
               <b style={{ color: "#0E4A84" }}>시간·요일 미지정 강의</b>
-
               <div
                 style={{
                   marginTop: 6,
@@ -200,11 +209,10 @@ export default function TimetableGrid() {
                   gap: 6,
                 }}
               >
-                {incompleteCourses.length === 0 && (
+                {incomplete.length === 0 && (
                   <span style={{ color: "#898C8E" }}>없음</span>
                 )}
-
-                {incompleteCourses.map((c, idx) => (
+                {incomplete.map((c, idx) => (
                   <span
                     key={idx}
                     onClick={() => removeIncomplete(idx)}
@@ -217,9 +225,8 @@ export default function TimetableGrid() {
                       color: "#0E4A84",
                       fontSize: 11,
                     }}
-                    title="클릭하면 제거됩니다."
                   >
-                    {c.course_name} ({c.professor_name || "-"})
+                    {c.course_name} ({c.professor || "-"})
                   </span>
                 ))}
               </div>

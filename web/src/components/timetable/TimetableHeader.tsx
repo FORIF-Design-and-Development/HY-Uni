@@ -1,4 +1,3 @@
-import React from "react";
 import { useTimetableStore } from "../../store/timetable.store";
 
 export default function TimetableHeader() {

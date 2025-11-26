@@ -15,18 +15,37 @@ function getTimeDay(x:string):string {
   return x.match(/^[가-힣]/)?.[0] || "";
 }
 
-function parseTime(x:string):{start:string; end:string} {
-  const m = x.match(/\((\d{2}):\d{2}-(\d{2}):\d{2}\)/);
-  return !m
-    ? { start: "", end: "" }
-    : { start: m[1], end: m[2] };
+function parseTime(x: string): { start: number | null; end: number | null } {
+  const m = x.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+  if (!m) return { start: null, end: null };
+
+  const startHour = parseInt(m[1], 10);
+  const startMin = parseInt(m[2], 10);
+  const endHour = parseInt(m[3], 10);
+  const endMin = parseInt(m[4], 10);
+
+  return {
+    start: startHour * 60 + startMin,
+    end: endHour * 60 + endMin
+  };
 }
+
+function toTimeString(minutes: number | null): string | null {
+  if (minutes === null) return null;
+
+  const h = Math.floor(minutes / 60).toString().padStart(2, "0");
+  const m = (minutes % 60).toString().padStart(2, "0");
+
+  return `${h}:${m}:00`;
+}
+
 
 function parseMajorLevel(level: string | null): string | null {
   if (!level) return null;
   const m = level.match(/(\d{3})/);
   return m ? m[1] : null;
 }
+
 
 async function main() {
   console.log("🚀 HYU 수강편람 전체 자동 크롤링 시작");
@@ -169,12 +188,11 @@ async function main() {
         offering_department: t.gnjSosokNm,
 
         day: day || "",
-        start_time: period.start || null,
-        end_time: period.end || null,
+        start_time: toTimeString(period.start),
+        end_time: toTimeString(period.end),
         location: rooms[i] || "",
-
         credit: t.hakjeom,
-      });
+        }); 
     });
   }
 

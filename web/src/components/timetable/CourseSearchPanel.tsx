@@ -1,4 +1,3 @@
-import React from "react";
 import { useTimetableStore } from "../../store/timetable.store";
 
 const DAY_ORDER: Record<string, number> = {
@@ -21,13 +20,11 @@ const periodToTimeRange = (start: number | null, end: number | null) => {
 };
 
 export default function CourseSearchPanel() {
-  const {
-    courses,
-    filters,
-    setFilters,
-    searchCourses,
-    addCourse,
-  } = useTimetableStore();
+  const courses = useTimetableStore(state => state.courses);
+  const filters = useTimetableStore(state => state.filters);
+  const setFilters = useTimetableStore(state => state.setFilters);
+  const searchCourses = useTimetableStore(state => state.searchCourses);
+  const addCourse = useTimetableStore(state => state.addCourse);
 
   return (
     <div
@@ -179,7 +176,7 @@ export default function CourseSearchPanel() {
           alignSelf: "flex-end",
         }}
       >
-        🔁 검색 새로고침
+        검색
       </button>
 
       {/* 결과 리스트 */}
@@ -230,7 +227,7 @@ export default function CourseSearchPanel() {
 
               return (
                 <div
-                  key={`${c.course_code}-${c.day}-${c.start_time || "X"}`}
+                  key={`${c.course_id}-${c.day}-${c.start_time}-${c.end_time}`}
                   style={{
                     border: "1px solid #ECEFF1",
                     borderRadius: 10,
@@ -282,7 +279,38 @@ export default function CourseSearchPanel() {
                   </div>
 
                   <button
-                    onClick={() => addCourse(c)}
+                     onClick={() => {
+                      console.log("Add", c);
+                      // 동일 과목+요일 데이터 모두 수집
+                      const existing = useTimetableStore.getState().selectedCourses;
+                      const same = [
+                        ...existing,
+                        c
+                      ].filter(
+                        x =>
+                          x.course_code === c.course_code &&
+                          x.day === c.day &&
+                          x.professor === c.professor &&
+                          x.location === c.location &&
+                          x.start_time != null &&
+                          x.end_time != null
+                      );
+
+
+
+                        // 병합된 시간 계산
+                        const minStart = Math.min(...same.map(x => Number(x.start_time)));
+                        const maxEnd = Math.max(...same.map(x => Number(x.end_time)));
+
+
+                        addCourse({
+                          ...c,
+                      
+                          start_time: minStart,
+                          end_time: maxEnd
+                        });
+
+                    }}
                     style={{
                       padding: "4px 8px",
                       borderRadius: 999,
