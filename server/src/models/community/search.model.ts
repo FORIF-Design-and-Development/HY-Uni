@@ -27,7 +27,7 @@ interface SearchResultRow extends RowDataPacket {
   content: string;
   is_anonymous: 0 | 1;
   like_count: number;
-  comment_count: number;
+  comment_count: number; // TODO: 댓글 생성/삭제 시 comment_count 업데이트 로직 구현 필요
   view_count: number;
   created_at: Date;
   board_id: number | null;
@@ -79,11 +79,10 @@ export interface SearchResponse {
   };
 }
 
-// content의 처음 200자를 추출하는 함수
-// TODO: 얼마나 잘라야 하는지 결정해야 함
+// content의 처음 100자를 추출하는 함수
 function extractContentSnippet(content: string): string {
   if (!content) return '';
-  return content.length > 200 ? content.substring(0, 200) : content;
+  return content.length > 100 ? content.substring(0, 100) : content;
 }
 
 // tag_ids와 tag_names 문자열을 파싱하여 배열로 변환
@@ -113,7 +112,7 @@ function toSearchResult(row: SearchResultRow): SearchResult {
       : null,
     counts: {
       likes: row.like_count,
-      comments: row.comment_count,
+      comments: row.comment_count, // TODO: 댓글 생성/삭제 시 comment_count 업데이트 로직 구현 필요
       views: row.view_count,
     },
     createdAt: new Date(row.created_at).toISOString(),
@@ -162,7 +161,7 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
       p.content,
       p.is_anonymous,
       p.like_count,
-      p.comment_count,
+      p.comment_count, -- TODO: 댓글 생성/삭제 시 comment_count 업데이트 로직 구현 필요
       p.view_count,
       p.created_at,
       b.board_id,

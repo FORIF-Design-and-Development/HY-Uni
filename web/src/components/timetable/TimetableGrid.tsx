@@ -1,21 +1,11 @@
 import { useTimetableStore } from "../../store/timetable.store";
 
-const periodToTimeRange = (start: number, end: number) => {
-  const base = 9;
-  const fmt = (h: number) => `${String(h).padStart(2, "0")}:00`;
-
-  const startTime = base + (start - 1);
-  const endTime = base + (end - 1);
-
-  return `${fmt(startTime)} ~ ${fmt(endTime)}`;
-};
-
 export default function TimetableGrid() {
   const { selectedCourses, removeCourse, removeIncomplete } =
     useTimetableStore();
 
   const days = ["월", "화", "수", "목", "금", "토"];
-  const times = Array.from({ length: 15 }, (_, i) => i + 1);
+  const times = Array.from({ length: 15 }, (_, i) => i + 1); // 1~15교시
 
   const validCourses = selectedCourses.filter(
     (c) => c.start_time != null && c.end_time != null
@@ -29,6 +19,9 @@ export default function TimetableGrid() {
     const palette = ["#0E4A84", "#898C8E"];
     return palette[id % 2];
   };
+
+  // ✅ 교시 → 분 변환 (09:00 시작)
+  const classStartMin = (t: number) => (t - 1) * 60 + 9 * 60; // 1교시 = 09:00
 
   return (
     <div
@@ -62,133 +55,154 @@ export default function TimetableGrid() {
         </thead>
 
         <tbody>
-          {times.map((t) => (
-            <tr key={t}>
-              <td
-                style={{
-                  border: "1px solid #ECEFF1",
-                  backgroundColor: "#F7F9FA",
-                  color: "#0E4A84",
-                  textAlign: "center",
-                  padding: 4,
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>{t}교시</div>
-                <div style={{ fontSize: 10, color: "#898C8E" }}>
-                  {periodToTimeRange(t, t)}
-                </div>
-              </td>
+          {times.map((t) => {
+            const tStart = classStartMin(t);
+            const tEnd = tStart + 60;
 
-              {days.map((day) => {
-                const startCourse = validCourses.find(
-                  (c) =>
-                    c.day === day && Number(c.start_time) === Number(t)
-                );
+            return (
+              <tr key={t}>
+                <td
+                  style={{
+                    border: "1px solid #ECEFF1",
+                    backgroundColor: "#F7F9FA",
+                    color: "#0E4A84",
+                    textAlign: "center",
+                    padding: 4,
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{t}교시</div>
+                  <div style={{ fontSize: 10, color: "#898C8E" }}>
+                    {`${String((tStart / 60) | 0).padStart(2, "0")}:${String(
+                      tStart % 60
+                    ).padStart(2, "0")} ~ ${String(
+                      (tEnd / 60) | 0
+                    ).padStart(2, "0")}:${String(tEnd % 60).padStart(2, "0")}`}
+                  </div>
+                </td>
 
-                const covered = validCourses.some(
-                  (c) =>
-                    c.day === day &&
-                    Number(c.start_time) < t &&
-                    Number(c.end_time) >= t
-                );
+                {days.map((day) => {
+                  const startCourse = validCourses.find((c) => {
+                    if (c.day !== day) return false;
 
-                if (covered) return null;
+                    const [sh, sm] = c.start_time.split(":").map(Number);
+                    const courseStart = sh * 60 + sm;
 
-                if (!startCourse) {
+                    return courseStart === tStart; // ✅ DB시간과 정확히 매칭
+                  });
+
+                  const covered = validCourses.some((c) => {
+                    if (c.day !== day) return false;
+
+                    const [sh, sm] = c.start_time.split(":").map(Number);
+                    const [eh, em] = c.end_time.split(":").map(Number);
+
+                    const sMin = sh * 60 + sm;
+                    const eMin = eh * 60 + em;
+
+                    return sMin < tStart && eMin > tStart; // ✅ 이미 포함된 시간
+                  });
+
+                  if (covered) return null;
+
+                  if (!startCourse) {
+                    return (
+                      <td
+                        key={`empty-${day}-${t}`}
+                        style={{
+                          border: "1px solid #ECEFF1",
+                          backgroundColor: "#ffffff",
+                          height: 36,
+                        }}
+                      />
+                    );
+                  }
+
+                  const [sh, sm] = startCourse.start_time.split(":").map(Number);
+                  const [eh, em] = startCourse.end_time.split(":").map(Number);
+
+                  const sMin = sh * 60 + sm;
+                  const eMin = eh * 60 + em;
+
+                  const duration = eMin - sMin;
+                  const span = Math.ceil(duration / 60); // ✅ 30분 포함 반영
+
                   return (
                     <td
-                      key={`empty-${day}-${t}`}
+                      key={`${day}-${startCourse.course_id}-${startCourse.start_time}`}
+                      rowSpan={span}
                       style={{
                         border: "1px solid #ECEFF1",
-                        backgroundColor: "#ffffff",
-                        height: 36,
-                      }}
-                    />
-                  );
-                }
-
-                const s = Number(startCourse.start_time);
-                const e = Number(startCourse.end_time);
-                const span = e - s + 1;
-
-                return (
-                  <td
-                    key={`${day}-${startCourse.course_id}-${s}-${t}`}
-                    rowSpan={span}
-                    style={{
-                      border: "1px solid #ECEFF1",
-                      backgroundColor: getColor(
-                        validCourses.indexOf(startCourse)
-                      ),
-                      color: "#ffffff",
-                      position: "relative",
-                      padding: 6,
-                      fontSize: 11,
-                    }}
-                  >
-                    <button
-                      onClick={() => {
-                        if (!window.confirm("해당 강의를 삭제하시겠습니까?"))
-                          return;
-                        removeCourse(
-                          startCourse.course_id,
-                          startCourse.day,
-                          startCourse.start_time,
-                          startCourse.end_time
-                        );
-                      }}
-                      style={{
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        border: "none",
-                        backgroundColor: "rgba(0,0,0,0.35)",
-                        color: "#fff",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        alignItems: "center",
-                        justifyContent: "center",
+                        backgroundColor: getColor(
+                          validCourses.indexOf(startCourse)
+                        ),
+                        color: "#ffffff",
+                        position: "relative",
+                        padding: 6,
+                        fontSize: 11,
                       }}
                     >
-                      x
-                    </button>
+                      <button
+                        onClick={() => {
+                          if (!window.confirm("해당 강의를 삭제하시겠습니까?"))
+                            return;
+                          removeCourse(
+                            startCourse.course_id,
+                            startCourse.day,
+                            startCourse.start_time,
+                            startCourse.end_time
+                          );
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          border: "none",
+                          backgroundColor: "rgba(0,0,0,0.35)",
+                          color: "#fff",
+                          cursor: "pointer",
+                          fontSize: 12,
+                        }}
+                      >
+                        x
+                      </button>
 
-                    <div style={{ fontWeight: 700, marginBottom: 2 }}>
-                      {startCourse.course_name}
-                    </div>
-                    <div style={{ marginBottom: 2 }}>
-                      {startCourse.professor || "-"}
-                    </div>
-
-                    <div style={{ fontSize: 10 }}>
-                      {startCourse.day} {s}~{e}교시
-                      <br />
-                      {periodToTimeRange(s, e)}
-                    </div>
-
-                    <div
-                      style={{
-                        marginTop: 4,
-                        padding: "3px 6px",
-                        borderRadius: 6,
-                        backgroundColor: "rgba(255,255,255,0.25)",
-                        fontSize: 10,
-                      }}
-                    >
-                      <div>{startCourse.location}</div>
-                      <div>
-                        {startCourse.major_division || "이수구분 없음"} ·{" "}
-                        {startCourse.credit ?? 0}학점
+                      <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                        {startCourse.course_name}
                       </div>
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+
+                      <div style={{ marginBottom: 2 }}>
+                        {startCourse.professor_name || "-"}
+                      </div>
+
+                      <div style={{ fontSize: 10 }}>
+                        {startCourse.day} {startCourse.start_time.slice(0, 5)}~
+                        {startCourse.end_time.slice(0, 5)}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 4,
+                          padding: "3px 6px",
+                          borderRadius: 6,
+                          backgroundColor: "rgba(255,255,255,0.25)",
+                          fontSize: 10,
+                        }}
+                      >
+                        <div>{startCourse.location}</div>
+                        <div>
+                          {startCourse.major_division || "이수구분 없음"} ·{" "}
+                          {startCourse.credit ?? 0}학점
+                        </div>
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
 
           <tr>
             <td
@@ -226,7 +240,7 @@ export default function TimetableGrid() {
                       fontSize: 11,
                     }}
                   >
-                    {c.course_name} ({c.professor || "-"})
+                    {c.course_name} ({c.professor_name || "-"})
                   </span>
                 ))}
               </div>
