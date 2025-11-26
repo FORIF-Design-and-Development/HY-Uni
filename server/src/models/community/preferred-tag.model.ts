@@ -30,6 +30,29 @@ export interface PreferredTagWithNameRow extends RowDataPacket {
   name: string;
 }
 
+// 사용자의 모든 선호 태그 목록을 조회하는 함수 (게시판 구분 없이)
+// API 없이 내부 로직으로만 사용
+// user_preference_tag와 tag를 JOIN하여 사용자의 모든 선호 태그를 반환
+export async function findAllPreferredTagsByUserId(
+  userId: number,
+): Promise<Array<{ id: number; name: string }>> {
+  const [rows] = await pool.query<PreferredTagWithNameRow[]>(
+    `
+      SELECT DISTINCT t.tag_id, t.name
+      FROM ${USER_PREFERENCE_TAG_TABLE} upt
+      INNER JOIN ${TAGS_TABLE} t ON upt.tag_id = t.tag_id
+      WHERE upt.user_id = ?
+      ORDER BY t.tag_id ASC
+    `.trim(),
+    [userId],
+  );
+
+  return rows.map((row) => ({
+    id: row.tag_id,
+    name: row.name,
+  }));
+}
+
 // 사용자와 게시판별 선호 태그 목록을 조회하는 함수
 // user_preference_tag와 board_tag를 JOIN하여 특정 게시판마다 사용자의 선호 태그만 필터링
 export async function findPreferredTagsByUserIdAndBoardId(
