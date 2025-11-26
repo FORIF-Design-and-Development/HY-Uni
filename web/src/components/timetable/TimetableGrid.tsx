@@ -1,27 +1,56 @@
 import { useTimetableStore } from "../../store/timetable.store";
 
+const days = ["월", "화", "수", "목", "금", "토"];
+
+// ✅ "HH:MM:SS" → 0~30 슬롯
+function timeToSlot(time: any) {
+  if (
+    !time ||
+    time === "-" ||
+    typeof time !== "string" ||
+    !time.includes(":")
+  ) {
+    return null;
+  }
+
+  const [h, m] = time.split(":").map(Number);
+
+  if (h === 24 && m === 0) return 30;
+
+  return (h - 9) * 2 + (m >= 30 ? 1 : 0);
+}
+
+
+// ✅ slot → "09:00" format
+function slotToTime(slot: number) {
+  const totalMin = 9 * 60 + slot * 30;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+}
+
 export default function TimetableGrid() {
   const { selectedCourses, removeCourse, removeIncomplete } =
     useTimetableStore();
 
-  const days = ["월", "화", "수", "목", "금", "토"];
-  const times = Array.from({ length: 15 }, (_, i) => i + 1); // 1~15교시
-
   const validCourses = selectedCourses.filter(
-    (c) => c.start_time != null && c.end_time != null
+    (c) =>
+      c.start_time &&
+      typeof c.start_time === "string" &&
+      c.start_time.includes(":") &&
+      c.end_time &&
+      typeof c.end_time === "string" &&
+      c.end_time.includes(":")
   );
 
   const incomplete = selectedCourses.filter(
-    (c) => c.start_time == null || c.end_time == null
+    (c) =>
+      !c.start_time ||
+      c.start_time === "-" ||
+      typeof c.start_time !== "string" ||
+      !c.start_time.includes(":")
   );
 
-  const getColor = (id: number) => {
-    const palette = ["#0E4A84", "#898C8E"];
-    return palette[id % 2];
-  };
-
-  // ✅ 교시 → 분 변환 (09:00 시작)
-  const classStartMin = (t: number) => (t - 1) * 60 + 9 * 60; // 1교시 = 09:00
 
   return (
     <div
@@ -44,7 +73,7 @@ export default function TimetableGrid() {
         <thead>
           <tr style={{ backgroundColor: "#0E4A84", color: "#ffffff" }}>
             <th style={{ padding: 6, border: "1px solid #ECEFF1", width: 82 }}>
-              교시
+              시간
             </th>
             {days.map((d) => (
               <th key={d} style={{ padding: 6, border: "1px solid #ECEFF1" }}>
@@ -55,155 +84,119 @@ export default function TimetableGrid() {
         </thead>
 
         <tbody>
-          {times.map((t) => {
-            const tStart = classStartMin(t);
-            const tEnd = tStart + 60;
-
-            return (
-              <tr key={t}>
+          {Array.from({ length: 30 }, (_, slot) => (
+            <tr key={slot}>
+              {/* 교시(시간)정보 */}
+              {slot % 2 === 0 && (
                 <td
+                  rowSpan={2}
                   style={{
                     border: "1px solid #ECEFF1",
                     backgroundColor: "#F7F9FA",
                     color: "#0E4A84",
                     textAlign: "center",
                     padding: 4,
+                    width: 82
                   }}
                 >
-                  <div style={{ fontWeight: 600 }}>{t}교시</div>
+                  <div style={{ fontWeight: 600 }}>
+                    {slot / 2 + 1}교시
+                  </div>
                   <div style={{ fontSize: 10, color: "#898C8E" }}>
-                    {`${String((tStart / 60) | 0).padStart(2, "0")}:${String(
-                      tStart % 60
-                    ).padStart(2, "0")} ~ ${String(
-                      (tEnd / 60) | 0
-                    ).padStart(2, "0")}:${String(tEnd % 60).padStart(2, "0")}`}
+                    {slotToTime(slot)} ~ {slotToTime(slot + 2)}
                   </div>
                 </td>
+              )}
 
-                {days.map((day) => {
-                  const startCourse = validCourses.find((c) => {
-                    if (c.day !== day) return false;
 
-                    const [sh, sm] = c.start_time.split(":").map(Number);
-                    const courseStart = sh * 60 + sm;
 
-                    return courseStart === tStart; // ✅ DB시간과 정확히 매칭
-                  });
+              {days.map((day) => {
+                const course = validCourses.find((c) => {
+                  const s = timeToSlot(c.start_time);
+                  return c.day === day && s === slot;
+                });
 
-                  const covered = validCourses.some((c) => {
-                    if (c.day !== day) return false;
+                const covered = validCourses.some((c) => {
+                  const s = timeToSlot(c.start_time);
+                  const e = timeToSlot(c.end_time);
+                  return c.day === day && s! < slot && e! > slot;
+                });
 
-                    const [sh, sm] = c.start_time.split(":").map(Number);
-                    const [eh, em] = c.end_time.split(":").map(Number);
+                if (covered) return null;
 
-                    const sMin = sh * 60 + sm;
-                    const eMin = eh * 60 + em;
-
-                    return sMin < tStart && eMin > tStart; // ✅ 이미 포함된 시간
-                  });
-
-                  if (covered) return null;
-
-                  if (!startCourse) {
-                    return (
-                      <td
-                        key={`empty-${day}-${t}`}
-                        style={{
-                          border: "1px solid #ECEFF1",
-                          backgroundColor: "#ffffff",
-                          height: 36,
-                        }}
-                      />
-                    );
-                  }
-
-                  const [sh, sm] = startCourse.start_time.split(":").map(Number);
-                  const [eh, em] = startCourse.end_time.split(":").map(Number);
-
-                  const sMin = sh * 60 + sm;
-                  const eMin = eh * 60 + em;
-
-                  const duration = eMin - sMin;
-                  const span = Math.ceil(duration / 60); // ✅ 30분 포함 반영
-
+                if (!course) {
                   return (
                     <td
-                      key={`${day}-${startCourse.course_id}-${startCourse.start_time}`}
-                      rowSpan={span}
+                      key={`${day}-${slot}`}
                       style={{
                         border: "1px solid #ECEFF1",
-                        backgroundColor: getColor(
-                          validCourses.indexOf(startCourse)
-                        ),
-                        color: "#ffffff",
-                        position: "relative",
-                        padding: 6,
-                        fontSize: 11,
+                        height: 18,
+                        backgroundColor: "#ffffff",
+                      }}
+                    />
+                  );
+                }
+
+                const s = timeToSlot(course.start_time)!;
+                const e = timeToSlot(course.end_time)!;
+                const span = e - s;
+
+                return (
+                  <td
+                    key={`${day}-${slot}-${course.course_id}`}
+                    rowSpan={span}
+                    style={{
+                      border: "1px solid #ECEFF1",
+                      backgroundColor: "#0E4A84",
+                      color: "#ffffff",
+                      position: "relative",
+                      padding: 6,
+                      fontSize: 11,
+                      height: 18 * span,
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        if (!window.confirm("해당 강의를 삭제하시겠습니까?")) return;
+                        removeCourse(
+                          course.course_id,
+                          course.day,
+                          course.start_time,
+                          course.end_time
+                        );
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        border: "none",
+                        backgroundColor: "rgba(0,0,0,0.35)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontSize: 12,
                       }}
                     >
-                      <button
-                        onClick={() => {
-                          if (!window.confirm("해당 강의를 삭제하시겠습니까?"))
-                            return;
-                          removeCourse(
-                            startCourse.course_id,
-                            startCourse.day,
-                            startCourse.start_time,
-                            startCourse.end_time
-                          );
-                        }}
-                        style={{
-                          position: "absolute",
-                          top: 4,
-                          right: 4,
-                          width: 18,
-                          height: 18,
-                          borderRadius: "50%",
-                          border: "none",
-                          backgroundColor: "rgba(0,0,0,0.35)",
-                          color: "#fff",
-                          cursor: "pointer",
-                          fontSize: 12,
-                        }}
-                      >
-                        x
-                      </button>
+                      x
+                    </button>
 
-                      <div style={{ fontWeight: 700, marginBottom: 2 }}>
-                        {startCourse.course_name}
-                      </div>
+                    <div style={{ fontWeight: 700 }}>{course.course_name}</div>
+                    <div>{course.professor || "-"}</div>
+                    <div style={{ fontSize: 10 }}>
+                      {course.day} {course.start_time.slice(0,5)}~{course.end_time.slice(0,5)}
+                    </div>
+                    <div style={{ fontSize: 10, marginTop: 4 }}>
+                      {course.location}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
 
-                      <div style={{ marginBottom: 2 }}>
-                        {startCourse.professor_name || "-"}
-                      </div>
-
-                      <div style={{ fontSize: 10 }}>
-                        {startCourse.day} {startCourse.start_time.slice(0, 5)}~
-                        {startCourse.end_time.slice(0, 5)}
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: 4,
-                          padding: "3px 6px",
-                          borderRadius: 6,
-                          backgroundColor: "rgba(255,255,255,0.25)",
-                          fontSize: 10,
-                        }}
-                      >
-                        <div>{startCourse.location}</div>
-                        <div>
-                          {startCourse.major_division || "이수구분 없음"} ·{" "}
-                          {startCourse.credit ?? 0}학점
-                        </div>
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-
+          {/* ✅ 미지정 */}
           <tr>
             <td
               colSpan={days.length + 1}
@@ -215,14 +208,7 @@ export default function TimetableGrid() {
               }}
             >
               <b style={{ color: "#0E4A84" }}>시간·요일 미지정 강의</b>
-              <div
-                style={{
-                  marginTop: 6,
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                }}
-              >
+              <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
                 {incomplete.length === 0 && (
                   <span style={{ color: "#898C8E" }}>없음</span>
                 )}
@@ -237,10 +223,9 @@ export default function TimetableGrid() {
                       cursor: "pointer",
                       backgroundColor: "#ffffff",
                       color: "#0E4A84",
-                      fontSize: 11,
                     }}
                   >
-                    {c.course_name} ({c.professor_name || "-"})
+                    {c.course_name} ({c.professor || "-"})
                   </span>
                 ))}
               </div>
