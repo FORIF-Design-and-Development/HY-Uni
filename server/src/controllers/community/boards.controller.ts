@@ -14,10 +14,7 @@ import {
   isBoardSubscribed,
   removeBoardSubscription,
 } from '../../models/community/board-subscription.model';
-
-interface RequestWithUser extends Request {
-  user?: { id?: number };
-}
+import { findAllBoardsWithTags } from '../../models/community/preferred-tag.model';
 
 // 게시판 목록 조회
 // - 사용자 즐겨찾기/구독 여부를 포함한 전체 게시판 리스트 반환
@@ -316,6 +313,82 @@ export async function toggleBoardSubscription(
       },
     });
   } catch (error) {
+    next(error);
+  }
+}
+
+// 모든 게시판의 태그 목록 조회
+// - 모든 게시판(최상위 + 하위)의 태그를 게시판별로 그룹화하여 반환
+export async function getAllBoardsTagsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) { // 인증 토큰이 없으면면
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    try {
+      const payload = verifyAccessToken(token);
+      // userId는 여기서 사용되지 않지만, 인증 여부 확인을 위해 필요
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 모든 게시판의 태그 조회
+    const boards = await findAllBoardsWithTags();
+
+    // 성공 응답
+    res.status(200).json({
+      data: {
+        boards,
+      },
+      error: null,
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    // 서버 오류 처리
+    res.status(500).json({
+      data: null,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: '서버 오류가 발생했습니다.',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
     next(error);
   }
 }

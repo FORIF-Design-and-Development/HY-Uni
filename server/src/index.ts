@@ -2,13 +2,14 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import express from 'express';
 import cron from 'node-cron';
+import path from 'path';
 import { pool } from './config/db';
 import { corsMiddleware } from './middlewares/cors';
 import { errorHandler, notFound } from './middlewares/error';
 import { registerRoutes } from './routes';
 
 import { runAggregation } from './services/community/popular-search-aggregator.service';
-import { initNoticeScheduler } from './controllers/campus/notice.controller';
+// import { initNoticeScheduler } from './controllers/campus/notice.controller';
 
 dotenv.config();
 
@@ -18,6 +19,9 @@ const port = Number(process.env.PORT || 3000);
 app.use(corsMiddleware);
 app.use(express.json());
 app.use(cookieParser());
+
+// 정적 파일 서빙 (업로드된 파일)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 registerRoutes(app);
 
@@ -40,7 +44,7 @@ app.use(errorHandler);
 app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
 
-  initNoticeScheduler();
+  // initNoticeScheduler();
 });
 
 // 인기 검색어 집계 스케줄러 설정

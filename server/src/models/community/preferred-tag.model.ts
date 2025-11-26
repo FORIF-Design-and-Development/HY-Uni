@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { BOARDS_TABLE } from './board.model';
 
 // DB 테이블 이름을 상수로 관리
 export const USER_PREFERENCE_TAG_TABLE = 'user_preference_tag';
@@ -28,6 +29,24 @@ export interface BoardTagRow extends RowDataPacket {
 export interface PreferredTagWithNameRow extends RowDataPacket {
   tag_id: number;
   name: string;
+}
+
+// 모든 게시판과 태그를 조회하는 쿼리 결과 형태
+export interface BoardWithTagsRow extends RowDataPacket {
+  board_id: number;
+  board_name: string;
+  parent_board_id: number | null;
+  target_board_id: number; // 태그를 조회할 게시판 ID (최상위는 자신, 하위는 부모)
+  response_board_name: string; // 응답에 사용할 게시판 이름 (하위는 부모 이름, 최상위는 자신의 이름)
+  tag_id: number | null; // 태그 ID (존재하지 않을 수 있음)
+  tag_name: string | null;
+}
+
+// 모든 게시판 태그 조회 결과 형태
+export interface BoardWithTags {
+  boardId: number;
+  boardName: string;
+  availableTags: Array<{ id: number; name: string }>;
 }
 
 // 사용자와 게시판별 선호 태그 목록을 조회하는 함수
@@ -241,4 +260,68 @@ export async function deletePreferredTags(
   }
 }
 
+// 모든 게시판의 태그를 게시판별로 그룹화하여 조회하는 함수
+// - 최상위 게시판: 자신의 태그 반환
+// - 하위 게시판: 부모 게시판의 태그 반환 (응답의 boardId는 부모 게시판 ID)
+export async function findAllBoardsWithTags(): Promise<BoardWithTags[]> {
+  // 모든 게시판과 태그를 한 번에 조회
+  // 하위 게시판의 경우 parent_board_id를 사용하여 부모 게시판의 태그를 조회
+  const sql = `
+    SELECT
+      b.board_id,
+      b.name as board_name,
+      b.parent_board_id, 
+      COALESCE(b.parent_board_id, b.board_id) as target_board_id, 
+      COALESCE(p.name, b.name) as response_board_name,
+      t.tag_id,
+      t.name as tag_name
+    FROM ${BOARDS_TABLE} b
+    LEFT JOIN ${BOARDS_TABLE} p 
+      ON b.parent_board_id = p.board_id
+    LEFT JOIN ${BOARD_TAG_TABLE} bt 
+      ON bt.board_id = COALESCE(b.parent_board_id, b.board_id)
+    LEFT JOIN ${TAGS_TABLE} t 
+      ON t.tag_id = bt.tag_id
+    ORDER BY b.board_id ASC, t.tag_id ASC
+  `;
+
+  const [rows] = await pool.query<BoardWithTagsRow[]>(sql);
+
+  // 게시판별로 그룹화
+  const boardMap = new Map<number, BoardWithTags>();
+
+  for (const row of rows) {
+    // 하위 게시판의 경우 부모 게시판 ID를 사용, 최상위 게시판은 자신의 ID 사용
+    const responseBoardId = row.parent_board_id ?? row.board_id; // parent_board_id가 null이면 board_id를 사용
+    // 하위 게시판의 경우 부모 게시판 이름 사용, 최상위 게시판은 자신의 이름 사용
+    const responseBoardName = row.response_board_name;
+
+    // 이미 존재하는 게시판인지 확인
+    if (!boardMap.has(responseBoardId)) { // 이미 존재하는 게시판이 아니면 추가
+      boardMap.set(responseBoardId, {
+        boardId: responseBoardId,
+        boardName: responseBoardName,
+        availableTags: [],
+      });
+    }
+
+    // 태그가 있는 경우 추가
+    if (row.tag_id !== null && row.tag_name !== null) { // 태그 존재 여부 확인
+      const board = boardMap.get(responseBoardId)!; // 게시판 객체 가져오기
+      // 중복 태그 체크 (같은 부모를 가진 하위 게시판들이 있을 수 있음)
+      const existingTag = board.availableTags.find(
+        (tag) => tag.id === row.tag_id, // 이미 추가된 태그인지 확인
+      );
+      if (!existingTag) { // 중복이 아니면
+        board.availableTags.push({ // 태그 추가
+          id: row.tag_id,
+          name: row.tag_name,
+        });
+      }
+    }
+  }
+
+  // board_id 순서로 정렬하여 반환
+  return Array.from(boardMap.values()).sort((a, b) => a.boardId - b.boardId);
+}
 
