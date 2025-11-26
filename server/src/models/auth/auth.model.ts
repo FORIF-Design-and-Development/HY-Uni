@@ -17,13 +17,13 @@ export interface User {
   portal_uuid: string | null;
   portal_user_id: string | null;
   auth_provider: AuthProvider;
+  grade: number | null;
   status: UserStatus;
   last_login_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
 
-//회원가입용 입력 타입
 export interface CreateUserInput {
   email: string;
   password: string | null;
@@ -33,6 +33,8 @@ export interface CreateUserInput {
   phone_number: string;
   nickname: string;
   department_id: number;
+  grade: number;
+  status?: UserStatus;
 }
 
 export async function findUserByEmail(email: string): Promise<User | null> {
@@ -63,12 +65,16 @@ export async function createUser(data: CreateUserInput): Promise<User> {
     phone_number,
     nickname,
     department_id,
+    grade,
+    status
   } = data;
+
+  const finalStatus: UserStatus = status ?? 'active';
 
   const [result] = await pool.query(
     `INSERT INTO user
-      (email, password, name, birth_date, student_number, phone_number, nickname, department_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      (email, password, name, birth_date, student_number, phone_number, nickname, department_id, grade, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       email,
       password,
@@ -78,6 +84,8 @@ export async function createUser(data: CreateUserInput): Promise<User> {
       phone_number,
       nickname,
       department_id,
+      grade,
+      finalStatus,
     ]
   );
 
