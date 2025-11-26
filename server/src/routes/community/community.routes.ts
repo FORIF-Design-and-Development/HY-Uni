@@ -3,6 +3,7 @@ import {
   getBoards,
   toggleBoardFavorite,
   toggleBoardSubscription,
+  getAllBoardsTagsHandler,
 } from '../../controllers/community/boards.controller';
 import { getPopularSearch, logSearch, searchPostsHandler } from '../../controllers/community/search.controller';
 import {
@@ -39,6 +40,9 @@ const router = Router();
 
 // 게시판 목록 조회
 router.get('/boards', getBoards);
+
+// 모든 게시판의 태그 목록 조회
+router.get('/boards/tags', getAllBoardsTagsHandler);
 
 // 인기 검색어 목록 조회
 router.get('/search/popular', getPopularSearch);
