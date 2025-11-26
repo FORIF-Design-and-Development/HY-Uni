@@ -1,17 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { register } from "../../api/auth/auth.api";
+import { register, UserStatus } from "../../api/auth/auth.api";
 import { getDepartments, Department } from "../../api//auth/department.api";
 
 export default function RegisterTest() {
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    name: "",
-    birth_date: "",
-    student_number: "",
-    phone_number: "",
-    nickname: "",
-  });
+  const [form, setForm] = useState<{
+  email: string;
+  password: string;
+  name: string;
+  birth_date: string;
+  student_number: string;
+  phone_number: string;
+  nickname: string;
+  grade: string;
+  status: UserStatus;
+}>({
+  email: "",
+  password: "",
+  name: "",
+  birth_date: "",
+  student_number: "",
+  phone_number: "",
+  nickname: "",
+  grade: "",
+  status: "active",
+});
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedCollege, setSelectedCollege] = useState<string>("");
@@ -61,6 +73,8 @@ export default function RegisterTest() {
       const res = await register({
         ...form,
         department_id: selectedDeptId,
+        grade: Number(form.grade),
+        status: form.status,
       });
       setResult(res);
     } catch (err: any) {
@@ -78,7 +92,7 @@ export default function RegisterTest() {
 
       <div style={{ display: "flex", flexDirection: "column", maxWidth: 360, gap: 8 }}>
         <input name="email" placeholder="email" value={form.email} onChange={handleChange} />
-        <input name="password" placeholder="password" value={form.password} onChange={handleChange} />
+        <input name="password" type="password" placeholder="password" value={form.password} onChange={handleChange} />
         <input name="name" placeholder="name" value={form.name} onChange={handleChange} />
         <input
           name="birth_date"
@@ -128,6 +142,39 @@ export default function RegisterTest() {
               {dept.department_name}
             </option>
           ))}
+        </select>
+
+        <select
+          name="grade"
+          value={form.grade}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              grade: e.target.value,
+            }))
+          }
+        >
+          <option value="">학년 선택</option>
+          <option value="1">1학년</option>
+          <option value="2">2학년</option>
+          <option value="3">3학년</option>
+          <option value="4">4학년</option>
+        </select>
+
+        <select
+          name="status"
+          value={form.status}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              status: e.target.value as UserStatus,
+            }))
+          }
+        >
+          <option value="active">재학</option>
+          <option value="inactive">휴학</option>
+          <option value="graduated">졸업</option>
+          <option value="leave">자퇴</option>
         </select>
 
         <button onClick={handleSubmit} style={{ marginTop: 10 }}>

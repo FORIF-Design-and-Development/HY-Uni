@@ -20,6 +20,8 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       phone_number,
       nickname,
       department_id,
+      grade,
+      status
     } = req.body;
 
     //1. 기본 검증
@@ -31,7 +33,8 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       !student_number ||
       !phone_number ||
       !nickname ||
-      department_id == null
+      department_id == null ||
+      grade == null
     ) {
       return res.status(400).json({
         success: false,
@@ -39,15 +42,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       });
     }
 
-    const departmentIdNum = Number(department_id);
-    if (Number.isNaN(departmentIdNum)) {
-      return res.status(400).json({
-        success: false,
-        message: '유효하지 않은 학과 선택입니다.',
-      });
-    }
-
-    const department = await findDepartmentById(departmentIdNum);
+    const department = await findDepartmentById(department_id);
     if (!department) {
       return res.status(400).json({
         success: false,
@@ -93,7 +88,9 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       student_number,
       phone_number,
       nickname,
-      department_id: departmentIdNum
+      department_id,
+      grade,
+      status
     });
 
     //5. 응답(민감 정보 제거)
