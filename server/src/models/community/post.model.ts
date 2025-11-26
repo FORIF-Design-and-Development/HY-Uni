@@ -28,7 +28,6 @@ const USERS_TABLE = 'user';
 const TAGS_TABLE = 'tag';
 
 // 첨부파일 입력 타입 정의
-// 첨부파일 입력 타입 정의
 export interface AttachmentItem {
   type: 'IMAGE' | 'VIDEO';
   url: string;
@@ -67,7 +66,167 @@ export interface UpdatePostPayload {
   isAnonymous?: boolean;
   tagIds?: number[];
   attachments?: AttachmentItem[];
-  // poll은 수정 불가
+  // TODO: 필요하다면 poll 수정 가능하도록 구현 필요
+}
+
+// 게시글 수정 결과 타입 정의
+export interface UpdatedPostResult {
+  postId: number;
+  status: 'edited';
+}
+
+// 게시글 삭제 결과 타입 정의
+export interface DeletedPostResult {
+  postId: number;
+  status: 'deleted';
+}
+
+// 게시글 반응 결과 타입 정의
+export interface PostReactionResult {
+  postId: number;
+  likesCount: number;
+  dislikesCount: number;
+  userReaction: 'like' | 'dislike' | null;
+}
+
+// 게시글 스크랩 결과 타입 정의
+export interface PostScrapResult {
+  postId: number;
+  scrapCount: number;
+  isScrapped: boolean;
+}
+
+// 게시글 투표 결과 타입 정의
+export interface PostVoteResult {
+  pollId: number;
+  userVote: {
+    selectedOptionId: number;
+  };
+  results: Array<{
+    id: number;
+    text: string;
+    voteCount: number;
+  }>;
+}
+
+// 게시글 상세 조회를 위한 타입 정의
+export interface PostDetailRow extends RowDataPacket {
+  post_id: number;
+  user_id: number;
+  board_id: number;
+  title: string;
+  content: string;
+  is_anonymous: 0 | 1;
+  like_count: number;
+  dislike_count: number;
+  comment_count: number;
+  scrap_count: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// 게시글 상세 조회를 위한 첨부파일 타입 정의
+export interface AttachmentRow extends RowDataPacket {
+  attachment_id: number;
+  post_id: number;
+  type: 'image' | 'video';
+  url: string;
+}
+
+// 게시글 상세 조회를 위한 투표 정보 타입 정의
+export interface PollRow extends RowDataPacket {
+  poll_id: number;
+  post_id: number;
+  question: string;
+  expired_at: Date | null;
+}
+
+// 게시글 상세 조회를 위한 투표 옵션 정보 타입 정의
+export interface PollOptionRow extends RowDataPacket {
+  option_id: number;
+  poll_id: number;
+  option_text: string;
+  vote_count: number;
+}
+
+// 게시글 상세 조회를 위한 사용자 투표 정보 타입 정의
+export interface UserVoteRow extends RowDataPacket {
+  option_id: number;
+}
+
+// 게시글 상세 조회를 위한 응답 타입 정의
+export interface PostDetailResponse {
+  id: number;
+  board: {
+    id: number;
+    name: string;
+  };
+  title: string;
+  content: string;
+  author: {
+    id: number;
+    nickname: string;
+    isMine: boolean;
+  };
+  timestamps: {
+    createdAt: string;
+    updatedAt: string;
+  };
+  counts: {
+    likes: number;
+    dislikes: number;
+    comments: number;
+    scraps: number;
+  };
+  tags: Array<{
+    id: number;
+    name: string;
+  }>;
+  userInteraction: {
+    reaction: 'like' | 'dislike' | null;
+    isScrapped: boolean;
+  };
+  attachments: {
+    images: Array<{ url: string }>;
+    videos: Array<{ url: string }>;
+  };
+  poll: {
+    id: number;
+    question: string;
+    userVote: {
+      selectedOptionId: number | null;
+    };
+    expiredAt: string | null;
+    options: Array<{
+      id: number;
+      text: string;
+      voteCount: number;
+    }>;
+  } | null;
+  comments: Array<{
+    id: number;
+    content: string;
+    isSecret: boolean;
+    isBlockedByFilter: boolean;
+    author: {
+      id: number;
+      nickname: string;
+      isPostAuthor: boolean;
+    };
+    timestamps: {
+      createdAt: string;
+      updatedAt: string;
+    };
+    counts: {
+      likes: number;
+      dislikes: number;
+    };
+    userInteraction: {
+      reaction: 'like' | 'dislike' | null;
+    };
+    parentCommentId: number | null;
+    replies: Array<any>;
+  }>;
 }
 
 // 게시글 삽입 함수
@@ -79,10 +238,10 @@ async function insertPost(
   const [result] = await connection.execute<ResultSetHeader>(
     `
       INSERT INTO ${POSTS_TABLE}
-        (user_id, board_id, title, content, is_anonymous)
+        (user_id, board_id, title, content, is_anonymous, status)
       VALUES
-        (?, ?, ?, ?, ?)
-    `.trim(),
+        (?, ?, ?, ?, ?, 'published') 
+    `.trim(), // 게시글 상태는 항상 'published'로 설정
     [userId, boardId, title, content, isAnonymous],
   );
   return result.insertId;
@@ -170,18 +329,10 @@ async function updatePostTags(
   }
 }
 
-type AttachmentType = 'image' | 'video';
-
-interface AttachmentRecord {
-  type: AttachmentType;
-  url: string;
-}
-
-// 첨부파일 형태 변환 함수
-// 첨부파일 형태 변환 함수
+// 첨부파일 형태 변환 함수 (외부 API 타입을 DB 저장 타입으로 변환)
 function buildAttachmentRecords(
   attachments?: AttachmentItem[],
-): AttachmentRecord[] {
+): Array<{ type: 'image' | 'video'; url: string }> {
   if (!attachments || !attachments.length) return [];
 
   return attachments.map((item) => ({
@@ -190,11 +341,11 @@ function buildAttachmentRecords(
   }));
 }
 
-// 첨부파일 삽입 함수
+// 첨부파일 삽입 함수(DB에 첨부파일 정보 삽입)
 async function insertAttachments(
   connection: PoolConnection,
   postId: number,
-  records: AttachmentRecord[],
+  records: Array<{ type: 'image' | 'video'; url: string }>,
 ): Promise<void> {
   if (!records.length) return;
 
@@ -283,7 +434,7 @@ async function updatePostAttachments(
   }
 }
 
-// 투표 삽입 함수
+// 투표 삽입 함수(DB에 투표 정보 삽입)
 async function insertPoll(
   connection: PoolConnection,
   postId: number,
@@ -306,6 +457,7 @@ async function insertPoll(
     }
   }
 
+  // DB에 투표 정보 삽입
   const [pollResult] = await connection.execute<ResultSetHeader>(
     `
       INSERT INTO ${POLLS_TABLE}
@@ -319,7 +471,7 @@ async function insertPoll(
   return pollResult.insertId ?? null;
 }
 
-// 투표 옵션 삽입 함수
+// 투표 옵션 삽입 함수(DB에 투표 옵션 정보 삽입)
 async function insertPollOptions(
   connection: PoolConnection,
   pollId: number,
@@ -341,7 +493,7 @@ async function insertPollOptions(
   );
 }
 
-// 게시글 생성 함수 (트랜잭션 통합 함수)
+// 게시글 생성 함수 (트랜잭션 통합 함수) - 게시글, 태그, 첨부파일, 투표 관련 데이터 삽입
 export async function createPostWithRelations(
   payload: CreatePostPayload,
 ): Promise<CreatedPostResult> {
@@ -356,12 +508,14 @@ export async function createPostWithRelations(
     // 게시글 태그 삽입
     await insertPostTags(connection, postId, payload.tagIds ?? []);
 
-    // 첨부파일 삽입
-    await insertAttachments(
-      connection,
-      postId,
-      buildAttachmentRecords(payload.attachments),
-    );
+    // 첨부파일이 있는 경우 첨부파일 삽입
+    if (payload.attachments && payload.attachments.length > 0) {
+      await insertAttachments(
+        connection,
+        postId,
+        buildAttachmentRecords(payload.attachments),
+      );
+    }
 
     // 투표가 있는 경우 투표 삽입
     if (payload.poll) {
@@ -373,53 +527,13 @@ export async function createPostWithRelations(
     }
 
     await connection.commit();
-    return { postId, status: 'published' };
+    return { postId, status: 'published' }; 
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
     connection.release();
   }
-}
-
-// 게시글 수정 결과 타입 정의
-export interface UpdatedPostResult {
-  postId: number;
-  status: 'edited';
-}
-
-// 게시글 삭제 결과 타입 정의
-export interface DeletedPostResult {
-  postId: number;
-  status: 'deleted';
-}
-
-// 게시글 반응 결과 타입 정의
-export interface PostReactionResult {
-  postId: number;
-  likesCount: number;
-  dislikesCount: number;
-  userReaction: 'like' | 'dislike' | null;
-}
-
-// 게시글 스크랩 결과 타입 정의
-export interface PostScrapResult {
-  postId: number;
-  scrapCount: number;
-  isScrapped: boolean;
-}
-
-// 게시글 투표 결과 타입 정의
-export interface PostVoteResult {
-  pollId: number;
-  userVote: {
-    selectedOptionId: number;
-  };
-  results: Array<{
-    id: number;
-    text: string;
-    voteCount: number;
-  }>;
 }
 
 // 게시글 수정 함수 (트랜잭션 통합 함수)
@@ -460,7 +574,7 @@ export async function updatePostWithRelations(
     }
 
     // 투표는 수정 불가 (기존 투표 유지)
-
+    // TODO: 필요하다면 투표 수정 가능하도록 구현 필요
     await connection.commit();
     return { postId: payload.postId, status: 'edited' };
   } catch (error) {
@@ -519,6 +633,7 @@ export async function deletePostWithRelations(
     }
 
     // 댓글 관련 데이터 삭제
+    // TODO: 댓글 기능 구현 후 검토
     // 4. comment_reaction 삭제 (comment 참조)
     await connection.execute(
       `
@@ -529,6 +644,7 @@ export async function deletePostWithRelations(
       [postId],
     );
 
+    // TODO: 댓글 기능 구현 후 검토
     // 5. comment 삭제
     await connection.execute(
       `DELETE FROM ${COMMENTS_TABLE} WHERE post_id = ?`,
@@ -620,123 +736,7 @@ export async function deletePostWithRelations(
   }
 }
 
-// 게시글 상세 조회를 위한 타입 정의
-export interface PostDetailRow extends RowDataPacket {
-  post_id: number;
-  user_id: number;
-  board_id: number;
-  title: string;
-  content: string;
-  is_anonymous: 0 | 1;
-  like_count: number;
-  dislike_count: number;
-  comment_count: number;
-  scrap_count: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface AttachmentRow extends RowDataPacket {
-  attachment_id: number;
-  post_id: number;
-  type: 'image' | 'video';
-  url: string;
-}
-
-export interface PollRow extends RowDataPacket {
-  poll_id: number;
-  post_id: number;
-  question: string;
-  expired_at: Date | null;
-}
-
-export interface PollOptionRow extends RowDataPacket {
-  option_id: number;
-  poll_id: number;
-  option_text: string;
-  vote_count: number;
-}
-
-export interface UserVoteRow extends RowDataPacket {
-  option_id: number; // poll_vote 테이블의 컬럼명
-}
-
-// 응답 타입 정의
-export interface PostDetailResponse {
-  id: number;
-  board: {
-    id: number;
-    name: string;
-  };
-  title: string;
-  content: string;
-  author: {
-    id: number;
-    nickname: string;
-    isMine: boolean;
-  };
-  timestamps: {
-    createdAt: string;
-    updatedAt: string;
-  };
-  counts: {
-    likes: number;
-    dislikes: number;
-    comments: number;
-    scraps: number;
-  };
-  tags: Array<{
-    id: number;
-    name: string;
-  }>;
-  userInteraction: {
-    reaction: 'like' | 'dislike' | null;
-    isScrapped: boolean;
-  };
-  attachments: {
-    images: Array<{ url: string }>;
-    videos: Array<{ url: string }>;
-  };
-  poll: {
-    id: number;
-    question: string;
-    userVote: {
-      selectedOptionId: number | null;
-    };
-    expiredAt: string | null;
-    options: Array<{
-      id: number;
-      text: string;
-      voteCount: number;
-    }>;
-  } | null;
-  comments: Array<{
-    id: number;
-    content: string;
-    isSecret: boolean;
-    isBlockedByFilter: boolean;
-    author: {
-      id: number;
-      nickname: string;
-      isPostAuthor: boolean;
-    };
-    timestamps: {
-      createdAt: string;
-      updatedAt: string;
-    };
-    counts: {
-      likes: number;
-      dislikes: number;
-    };
-    userInteraction: {
-      reaction: 'like' | 'dislike' | null;
-    };
-    parentCommentId: number | null;
-    replies: Array<any>;
-  }>;
-}
-
-// 게시글 기본 정보 조회
+// 게시글 기본 정보 조회 함수(DB에서 게시글 기본 정보 조회)
 async function findPostById(postId: number): Promise<PostDetailRow | null> {
   const sql = `
     SELECT 
@@ -1101,7 +1101,8 @@ export async function togglePostScrap(
   }
 }
 
-// 게시글 상세 조회 함수 (트랜잭션 통합 함수수)
+// TODO: 댓글 기능 구현 후 다시 검토
+// 게시글 상세 조회 함수 (트랜잭션 통합 함수)
 export async function findPostDetailById(
   postId: number,
   currentUserId: number | null,
@@ -1256,6 +1257,7 @@ export async function findPostDetailById(
 // 게시판별 게시글 목록 조회를 위한 타입 정의
 export type BoardPostSortBy = 'latest' | 'likes' | 'comments' | 'views';
 
+// 게시판별 게시글 목록 조회를 위한 옵션 타입 정의
 export interface BoardPostListOptions {
   boardId: number;
   page: number;
@@ -1333,10 +1335,10 @@ export interface BoardPostListResponse {
 }
 
 // TODO: 글자수 조정
-// content의 처음 100자를 추출하는 함수
+// content의 처음 15자를 추출하는 함수
 function extractContentSnippet(content: string): string {
   if (!content) return '';
-  return content.length > 100 ? content.substring(0, 100) : content;
+  return content.length > 15 ? content.substring(0, 15) : content;
 }
 
 // tag_ids와 tag_names 문자열을 파싱하여 배열로 변환
@@ -1437,7 +1439,8 @@ export async function findPostsByBoardId(
     }
 
     // 사용자의 필터 키워드 조회
-    const filterKeywords = await findFilterKeywordsByUserId(userId);
+    const filterKeywordsWithId = await findFilterKeywordsByUserId(userId);
+    const filterKeywords = filterKeywordsWithId.map((k) => k.name);
 
     // 필터 키워드 제외 조건 생성
     let filterKeywordConditions = '';
@@ -1460,7 +1463,7 @@ export async function findPostsByBoardId(
     if (preferredKeywords.length > 0) {
       const conditions: string[] = [];
       for (const keyword of preferredKeywords) {
-        const keywordPattern = `%${keyword}%`;
+        const keywordPattern = `%${keyword.name}%`;
         conditions.push('(p.title LIKE ? OR p.content LIKE ?)');
         preferredKeywordParams.push(keywordPattern, keywordPattern);
       }
@@ -1553,10 +1556,10 @@ export async function findPostsByBoardId(
       if (row.title && row.content) {
         for (const keyword of preferredKeywords) {
           if (
-            row.title.includes(keyword) ||
-            row.content.includes(keyword)
+            row.title.includes(keyword.name) ||
+            row.content.includes(keyword.name)
           ) {
-            matchedKeywords.push(keyword);
+            matchedKeywords.push(keyword.name);
           }
         }
       }
@@ -1622,7 +1625,8 @@ export async function findPostsByBoardId(
   // 사용자의 필터 키워드 조회 (userId가 있는 경우)
   let filterKeywords: string[] = [];
   if (userId) {
-    filterKeywords = await findFilterKeywordsByUserId(userId);
+    const filterKeywordsWithId = await findFilterKeywordsByUserId(userId);
+    filterKeywords = filterKeywordsWithId.map((k) => k.name);
   }
 
   // 필터 키워드 제외 조건 생성
