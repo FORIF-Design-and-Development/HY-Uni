@@ -15,10 +15,6 @@ import {
   removeBoardSubscription,
 } from '../../models/community/board-subscription.model';
 
-interface RequestWithUser extends Request {
-  user?: { id?: number };
-}
-
 // 게시판 목록 조회
 // - 사용자 즐겨찾기/구독 여부를 포함한 전체 게시판 리스트 반환
 export async function getBoards(
