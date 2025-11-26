@@ -1,5 +1,14 @@
 import { useState, useMemo } from "react";
 import { useTimetableStore } from "../../store/timetable.store";
+import { useNavigate } from "react-router-dom";
+
+export default function CourseSearchPanel() {
+  const navigate = useNavigate();
+
+  const goToReviews = (courseId: number) => {
+    navigate(`/reviews/${courseId}`);
+  };
+
 
 const DAY_ORDER: Record<string, number> = {
   월: 1,
@@ -54,9 +63,6 @@ function timeToPeriod(time: string | number | null) {
 
   return null;
 }
-
-
-export default function CourseSearchPanel() {
   const {
     courses,
     filters,
@@ -415,6 +421,20 @@ export default function CourseSearchPanel() {
                 >
                   ➕ 시간표에 추가
                 </button>
+               <button
+                onClick={() => goToReviews(c.course_id)}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  border: "none",
+                  backgroundColor: "#0E4A84",
+                  color: "#ffffff",
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                ⭐ 강의평
+              </button>
               </div>
             );
           })

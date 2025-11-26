@@ -12,6 +12,8 @@ import coursesRoutes from './timetable/courses.routes';
 import timetableRoutes from './timetable/timetable.routes';
 import timetablesetsRoutes from './timetable/timetablesets.routes';
 import calendarRoutes from './campus/calendar.routes';
+import reviewRouter from "./timetable/review.routers"; 
+
 
 export function registerRoutes(app: Express) {
   //기본 라우트
@@ -30,4 +32,5 @@ export function registerRoutes(app: Express) {
   app.use('/api/timetable', timetableRoutes);
   app.use('/api/timetablesets', timetablesetsRoutes);
   app.use('/api/calendar', calendarRoutes);
+  app.use("/api/reviews", reviewRouter);
 }

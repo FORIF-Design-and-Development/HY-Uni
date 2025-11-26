@@ -62,7 +62,15 @@ export default function TimetableHeader() {
         </button>
 
       <button
-        onClick={() => deleteSet(selectedSet)}
+        onClick={() => {
+          if (!selectedSet) return;
+
+          const set = sets.find(s => s.timetable_list_id === selectedSet);
+          const name = set?.timetable_name || "선택된 시간표";
+
+          if (!window.confirm(`[${name}]을(를) 삭제하시겠습니까?`)) return;
+          deleteSet(selectedSet);
+        }}
         style={{
           padding: "6px 10px",
           borderRadius: 8,
