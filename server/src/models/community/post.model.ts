@@ -4,6 +4,8 @@ import { findBoardById } from './board.model';
 import { findTagsByPostId } from './tag.model';
 import { findCommentsByPostId, findCommentReaction, COMMENTS_TABLE, COMMENT_REACTIONS_TABLE } from './comment.model';
 import { findFilterKeywordsByUserId } from './filter-keyword.model';
+import { findPreferredKeywordsByUserId } from './preferred-keyword.model';
+import { findAllPreferredTagsByUserId } from './preferred-tag.model';
 import fs from 'fs/promises';
 import path from 'path';
 import {
@@ -21,9 +23,10 @@ const POLL_OPTIONS_TABLE = 'poll_option';
 const POST_REACTIONS_TABLE = 'post_reaction';
 const SCRAPS_TABLE = 'scrap';
 const POLL_VOTES_TABLE = 'poll_vote';
+const BOARDS_TABLE = 'board';
 const USERS_TABLE = 'user';
+const TAGS_TABLE = 'tag';
 
-// 첨부파일 입력 타입 정의
 // 첨부파일 입력 타입 정의
 export interface AttachmentItem {
   type: 'IMAGE' | 'VIDEO';
@@ -403,6 +406,19 @@ export interface PostScrapResult {
   postId: number;
   scrapCount: number;
   isScrapped: boolean;
+}
+
+// 게시글 투표 결과 타입 정의
+export interface PostVoteResult {
+  pollId: number;
+  userVote: {
+    selectedOptionId: number;
+  };
+  results: Array<{
+    id: number;
+    text: string;
+    voteCount: number;
+  }>;
 }
 
 // 게시글 수정 함수 (트랜잭션 통합 함수)
@@ -858,15 +874,101 @@ async function findUserVote(pollId: number, userId: number | null): Promise<numb
   if (!userId) return null;
 
   const sql = `
-    SELECT pv.option_id
-    FROM ${POLL_VOTES_TABLE} pv
-    INNER JOIN ${POLL_OPTIONS_TABLE} po ON pv.option_id = po.option_id
-    WHERE po.poll_id = ? AND pv.user_id = ?
+    SELECT option_id
+    FROM ${POLL_VOTES_TABLE}
+    WHERE poll_id = ? AND user_id = ?
     LIMIT 1
   `;
 
   const [rows] = await pool.query<UserVoteRow[]>(sql, [pollId, userId]);
   return rows.length > 0 && rows[0] ? rows[0].option_id : null;
+}
+
+// 게시글 투표 함수 (트랜잭션 통합 함수)
+export async function votePostPoll(
+  postId: number,
+  userId: number,
+  optionId: number,
+): Promise<PostVoteResult> {
+  const connection = await pool.getConnection();
+  try {
+    // 트랜잭션 시작
+    await connection.beginTransaction();
+
+    // 게시글 존재 여부 확인
+    const post = await findPostById(postId);
+    if (!post) {
+      throw new Error('POST_NOT_FOUND');
+    }
+
+    // 투표 존재 여부 확인
+    const poll = await findPollByPostId(postId);
+    if (!poll) {
+      throw new Error('POLL_NOT_FOUND');
+    }
+
+    // 투표 만료 여부 확인
+    if (poll.expired_at) {
+      const expiredAt = new Date(poll.expired_at);
+      const now = new Date();
+      if (now > expiredAt) {
+        throw new Error('POLL_EXPIRED');
+      }
+    }
+
+    // 사용자 기존 투표 확인
+    const existingVote = await findUserVote(poll.poll_id, userId);
+    if (existingVote !== null) {
+      throw new Error('ALREADY_VOTED');
+    }
+
+    // 투표 옵션 유효성 확인 (해당 poll_id에 속한 option_id인지)
+    const [optionRows] = await connection.query<PollOptionRow[]>(
+      `SELECT option_id, poll_id, option_text, vote_count FROM ${POLL_OPTIONS_TABLE} WHERE option_id = ? AND poll_id = ?`,
+      [optionId, poll.poll_id],
+    );
+
+    if (optionRows.length === 0) {
+      throw new Error('INVALID_OPTION');
+    }
+
+    // poll_vote 테이블에 INSERT
+    await connection.execute(
+      `INSERT INTO ${POLL_VOTES_TABLE} (poll_id, user_id, option_id) VALUES (?, ?, ?)`,
+      [poll.poll_id, userId, optionId],
+    );
+
+    // poll_options 테이블에서 최신 vote_count 조회 (트리거로 자동 업데이트됨) - 트랜잭션 내에서 조회
+    const [pollOptionRows] = await connection.query<PollOptionRow[]>(
+      `
+        SELECT option_id, poll_id, option_text, vote_count
+        FROM ${POLL_OPTIONS_TABLE}
+        WHERE poll_id = ?
+        ORDER BY option_id ASC
+      `,
+      [poll.poll_id],
+    );
+    const pollOptions = pollOptionRows;
+
+    await connection.commit();
+
+    return {
+      pollId: poll.poll_id,
+      userVote: {
+        selectedOptionId: optionId,
+      },
+      results: pollOptions.map((option) => ({
+        id: option.option_id,
+        text: option.option_text,
+        voteCount: option.vote_count,
+      })),
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 // 게시글 반응 조회
@@ -1283,7 +1385,7 @@ export async function findPostDetailById(
     counts: {
       likes: post.like_count,
       dislikes: post.dislike_count,
-      comments: post.comment_count,
+      comments: post.comment_count, // TODO: 댓글 생성/삭제 시 comment_count 업데이트 로직 구현 필요
       scraps: post.scrap_count,
     },
     tags: tags.map((tag) => ({
@@ -1300,6 +1402,578 @@ export async function findPostDetailById(
     },
     poll: pollData,
     comments: rootComments,
+  };
+}
+
+// 게시판별 게시글 목록 조회를 위한 타입 정의
+export type BoardPostSortBy = 'latest' | 'likes' | 'comments' | 'views';
+
+export interface BoardPostListOptions {
+  boardId: number;
+  page: number;
+  pageSize: number;
+  sortBy: BoardPostSortBy;
+  userId?: number; // 필터 키워드 적용을 위한 사용자 ID (선택적)
+}
+
+// 게시판별 게시글 목록 Row 타입
+interface BoardPostListRow extends RowDataPacket {
+  post_id: number;
+  title: string;
+  content: string;
+  is_anonymous: 0 | 1;
+  like_count: number;
+  comment_count: number;
+  view_count: number;
+  created_at: Date;
+  board_id: number;
+  board_name: string;
+  user_id: number | null;
+  user_nickname: string | null;
+  tag_ids: string | null; // GROUP_CONCAT 결과
+  tag_names: string | null; // GROUP_CONCAT 결과
+  image_url: string | null;
+  video_url: string | null;
+}
+
+// 게시판별 게시글 목록 항목 타입
+export interface BoardPostListItem {
+  id: number;
+  title: string;
+  contentSnippet: string;
+  board: {
+    id: number;
+    name: string;
+  };
+  recommendationReason?: {
+    matchedKeywords: string[];
+    matchedTags: string[];
+  };
+  counts: {
+    likes: number;
+    comments: number;
+    views: number;
+  };
+  createdAt: string;
+  author: {
+    nickname: string;
+  };
+  tags: Array<{
+    id: number;
+    name: string;
+  }>;
+  previews: {
+    imageUrl: string | null;
+    videoUrl: string | null;
+  };
+}
+
+// 게시판별 게시글 목록 응답 타입
+export interface BoardPostListResponse {
+  boardInfo: {
+    id: number;
+    name: string;
+    description: string | null;
+  };
+  posts: BoardPostListItem[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+  };
+}
+
+// TODO: 글자수 조정
+// content의 처음 100자를 추출하는 함수
+function extractContentSnippet(content: string): string {
+  if (!content) return '';
+  return content.length > 100 ? content.substring(0, 100) : content;
+}
+
+// tag_ids와 tag_names 문자열을 파싱하여 배열로 변환
+function parseTags(tagIds: string | null, tagNames: string | null): Array<{ id: number; name: string }> {
+  if (!tagIds || !tagNames) return [];
+  
+  const ids = tagIds.split(',').map(id => Number.parseInt(id.trim(), 10));
+  const names = tagNames.split(',');
+  
+  return ids.map((id, index) => ({
+    id,
+    name: names[index]?.trim() || '',
+  })).filter(tag => tag.id && tag.name);
+}
+
+// Row를 BoardPostListItem으로 변환
+function toBoardPostListItem(row: BoardPostListRow): BoardPostListItem {
+  return {
+    id: row.post_id,
+    title: row.title,
+    contentSnippet: extractContentSnippet(row.content),
+    board: {
+      id: row.board_id,
+      name: row.board_name,
+    },
+    counts: {
+      likes: row.like_count,
+      comments: row.comment_count, // TODO: 댓글 생성/삭제 시 comment_count 업데이트 로직 구현 필요
+      views: row.view_count,
+    },
+    createdAt: new Date(row.created_at).toISOString(),
+    author: {
+      nickname: row.is_anonymous ? '익명' : (row.user_nickname || '익명'),
+    },
+    tags: parseTags(row.tag_ids, row.tag_names),
+    previews: {
+      imageUrl: row.image_url || null,
+      videoUrl: row.video_url || null,
+    },
+  };
+}
+
+// 게시판별 게시글 목록 조회 함수
+export async function findPostsByBoardId(
+  options: BoardPostListOptions,
+): Promise<BoardPostListResponse> {
+  const { boardId, page, pageSize, sortBy, userId } = options;
+  const offset = (page - 1) * pageSize;
+
+  // 게시판 정보 조회
+  const board = await findBoardById(boardId);
+  if (!board) {
+    throw new Error('BOARD_NOT_FOUND');
+  }
+
+  // 추천 게시판 (board_id = 2) 특별 처리
+  // TODO: 하드 코딩 수정
+  if (boardId === 2) {
+    if (!userId) {
+      // userId가 없으면 빈 결과 반환
+      return {
+        boardInfo: {
+          id: board.boardId,
+          name: board.name,
+          description: board.description,
+        },
+        posts: [],
+        pagination: {
+          currentPage: page,
+          pageSize,
+          totalResults: 0,
+          totalPages: 0,
+        },
+      };
+    }
+
+    // 선호 키워드 조회
+    const preferredKeywords = await findPreferredKeywordsByUserId(userId);
+    // 모든 선호 태그 조회
+    const preferredTags = await findAllPreferredTagsByUserId(userId);
+
+    // 선호 키워드/태그가 없으면 빈 결과 반환
+    if (preferredKeywords.length === 0 && preferredTags.length === 0) {
+      return {
+        boardInfo: {
+          id: board.boardId,
+          name: board.name,
+          description: board.description,
+        },
+        posts: [],
+        pagination: {
+          currentPage: page,
+          pageSize,
+          totalResults: 0,
+          totalPages: 0,
+        },
+      };
+    }
+
+    // 사용자의 필터 키워드 조회
+    const filterKeywords = await findFilterKeywordsByUserId(userId);
+
+    // 필터 키워드 제외 조건 생성
+    let filterKeywordConditions = '';
+    const filterParams: any[] = [];
+    if (filterKeywords.length > 0) {
+      const conditions: string[] = [];
+      for (const keyword of filterKeywords) {
+        const keywordPattern = `%${keyword}%`;
+        conditions.push('(p.title NOT LIKE ? AND p.content NOT LIKE ?)');
+        filterParams.push(keywordPattern, keywordPattern);
+      }
+      if (conditions.length > 0) {
+        filterKeywordConditions = `AND ${conditions.join(' AND ')}`;
+      }
+    }
+
+    // 선호 키워드 매칭 조건 생성
+    let preferredKeywordConditions = '';
+    const preferredKeywordParams: any[] = [];
+    if (preferredKeywords.length > 0) {
+      const conditions: string[] = [];
+      for (const keyword of preferredKeywords) {
+        const keywordPattern = `%${keyword}%`;
+        conditions.push('(p.title LIKE ? OR p.content LIKE ?)');
+        preferredKeywordParams.push(keywordPattern, keywordPattern);
+      }
+      if (conditions.length > 0) {
+        preferredKeywordConditions = `(${conditions.join(' OR ')})`;
+      }
+    }
+
+    // 선호 태그 매칭 조건 생성
+    let preferredTagConditions = '';
+    const preferredTagParams: any[] = [];
+    if (preferredTags.length > 0) {
+      const preferredTagIds = preferredTags.map((tag) => tag.id);
+      const placeholders = preferredTagIds.map(() => '?').join(', ');
+      preferredTagConditions = `pt.tag_id IN (${placeholders})`;
+      preferredTagParams.push(...preferredTagIds);
+    }
+
+    // 키워드 또는 태그 매칭 조건 결합
+    let matchingConditions = '';
+    if (preferredKeywordConditions && preferredTagConditions) {
+      matchingConditions = `AND (${preferredKeywordConditions} OR ${preferredTagConditions})`;
+    } else if (preferredKeywordConditions) {
+      matchingConditions = `AND ${preferredKeywordConditions}`;
+    } else if (preferredTagConditions) {
+      matchingConditions = `AND ${preferredTagConditions}`;
+    }
+
+    // 정렬 조건 생성
+    let orderBy = '';
+    if (sortBy === 'likes') {
+      orderBy = 'ORDER BY p.like_count DESC, p.created_at DESC';
+    } else if (sortBy === 'comments') {
+      orderBy = 'ORDER BY p.comment_count DESC, p.created_at DESC';
+    } else if (sortBy === 'views') {
+      orderBy = 'ORDER BY p.view_count DESC, p.created_at DESC';
+    } else {
+      // latest (default)
+      orderBy = 'ORDER BY p.created_at DESC';
+    }
+
+    // 추천 게시판 조회 쿼리 (board_id 조건 제거, 여러 게시판의 게시글 포함)
+    // TODO: 성능 문제 개선
+    const sql = `
+      SELECT DISTINCT
+        p.post_id,
+        p.title,
+        p.content,
+        p.is_anonymous,
+        p.like_count,
+        p.comment_count, -- TODO: 댓글 생성/삭제 시 comment_count 업데이트 로직 구현 필요
+        p.view_count,
+        p.created_at,
+        b.board_id,
+        b.name AS board_name,
+        u.user_id,
+        u.nickname AS user_nickname,
+        GROUP_CONCAT(DISTINCT t.tag_id ORDER BY t.tag_id) AS tag_ids,
+        GROUP_CONCAT(DISTINCT t.name ORDER BY t.tag_id) AS tag_names,
+        (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'image' LIMIT 1) AS image_url,
+        (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url
+      FROM ${POSTS_TABLE} AS p
+      LEFT JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
+      LEFT JOIN ${USERS_TABLE} AS u ON p.user_id = u.user_id
+      LEFT JOIN ${POST_TAGS_TABLE} AS pt ON p.post_id = pt.post_id
+      LEFT JOIN ${TAGS_TABLE} AS t ON pt.tag_id = t.tag_id
+      WHERE p.status IN ('published', 'edited')
+        ${matchingConditions}
+        ${filterKeywordConditions}
+      GROUP BY p.post_id
+      ${orderBy}
+      LIMIT ? OFFSET ?
+    `;
+
+    // 쿼리 파라미터 구성
+    const queryParams: any[] = [];
+    queryParams.push(...preferredKeywordParams);
+    queryParams.push(...preferredTagParams);
+    queryParams.push(...filterParams);
+    queryParams.push(pageSize, offset);
+
+    const [rows] = await pool.query<BoardPostListRow[]>(sql, queryParams);
+    
+    // 매칭 정보 수집 (애플리케이션 레벨)
+    const postsWithRecommendation = rows.map((row) => {
+      const post = toBoardPostListItem(row);
+      
+      // 매칭된 키워드 찾기
+      const matchedKeywords: string[] = [];
+      if (row.title && row.content) {
+        for (const keyword of preferredKeywords) {
+          if (
+            row.title.includes(keyword) ||
+            row.content.includes(keyword)
+          ) {
+            matchedKeywords.push(keyword);
+          }
+        }
+      }
+
+      // 매칭된 태그 찾기
+      const matchedTags: string[] = [];
+      if (row.tag_names) {
+        const postTagNames = row.tag_names.split(',').map((name) => name.trim());
+        for (const preferredTag of preferredTags) {
+          if (postTagNames.includes(preferredTag.name)) {
+            matchedTags.push(preferredTag.name);
+          }
+        }
+      }
+
+      // recommendationReason 추가
+      if (matchedKeywords.length > 0 || matchedTags.length > 0) {
+        post.recommendationReason = {
+          matchedKeywords,
+          matchedTags,
+        };
+      }
+
+      return post;
+    });
+
+    // 총 게시글 수 계산
+    const countSql = `
+      SELECT COUNT(DISTINCT p.post_id) AS total
+      FROM ${POSTS_TABLE} AS p
+      LEFT JOIN ${POST_TAGS_TABLE} AS pt ON p.post_id = pt.post_id
+      WHERE p.status IN ('published', 'edited')
+        ${matchingConditions}
+        ${filterKeywordConditions}
+    `;
+
+    const countParams: any[] = [];
+    countParams.push(...preferredKeywordParams);
+    countParams.push(...preferredTagParams);
+    countParams.push(...filterParams);
+
+    const [countRows] = await pool.query<RowDataPacket[]>(countSql, countParams);
+    const totalResults = (countRows[0]?.total as number) || 0;
+    const totalPages = Math.ceil(totalResults / pageSize);
+
+    return {
+      boardInfo: {
+        id: board.boardId,
+        name: board.name,
+        description: board.description,
+      },
+      posts: postsWithRecommendation,
+      pagination: {
+        currentPage: page,
+        pageSize,
+        totalResults,
+        totalPages,
+      },
+    };
+  }
+
+  // 일반 게시판 처리 (기존 로직)
+  // 사용자의 필터 키워드 조회 (userId가 있는 경우)
+  let filterKeywords: string[] = [];
+  if (userId) {
+    filterKeywords = await findFilterKeywordsByUserId(userId);
+  }
+
+  // 필터 키워드 제외 조건 생성
+  // TODO: 성능 문제 발생 가능
+  let filterKeywordConditions = '';
+  const filterParams: any[] = [];
+  if (filterKeywords.length > 0) {
+    // 각 필터 키워드에 대해 제목과 내용에서 제외
+    const conditions: string[] = [];
+    for (const keyword of filterKeywords) {
+      const keywordPattern = `%${keyword}%`;
+      conditions.push('(p.title NOT LIKE ? AND p.content NOT LIKE ?)');
+      filterParams.push(keywordPattern, keywordPattern);
+    }
+    if (conditions.length > 0) {
+      filterKeywordConditions = `AND ${conditions.join(' AND ')}`;
+    }
+  }
+
+  // 게시판별 필터 조건 적용(HOT/BEST 게시판 필터 조건 적용)
+  // TODO: 하드 코딩 수정
+  let boardFilterCondition = '';
+  let boardIdCondition = 'WHERE p.board_id = ?'; // 기본: 특정 게시판만 조회
+  if (boardId === 3) {
+    // HOT/BEST 게시판: 여러 게시판의 게시글 중 like_count >= 10인 것만 조회
+    boardFilterCondition = 'AND p.like_count >= 10';
+    boardIdCondition = 'WHERE 1 = 1'; // board_id 조건 제거
+  }
+
+  // 사용자별 게시판 필터 조건 적용
+  // TODO: 하드 코딩 수정
+  let userBoardJoinCondition = '';
+  let userBoardWhereCondition = '';
+  
+  if (boardId === 83) {
+    // 내가 쓴 게시글만 조회 (여러 게시판의 게시글 포함)
+    boardIdCondition = 'WHERE 1 = 1'; // board_id 조건 제거
+    if (!userId) {
+      // userId가 없으면 빈 결과 반환
+      userBoardWhereCondition = 'AND 1 = 0'; // 항상 false 조건
+    } else {
+      userBoardWhereCondition = 'AND p.user_id = ?';
+    }
+  } else if (boardId === 84) {
+    // 내가 스크랩한 게시글 조회 (여러 게시판의 게시글 포함)
+    boardIdCondition = 'WHERE 1 = 1'; // board_id 조건 제거
+    if (!userId) {
+      userBoardWhereCondition = 'AND 1 = 0';
+    } else {
+      userBoardJoinCondition = `INNER JOIN ${SCRAPS_TABLE} AS s ON p.post_id = s.post_id AND s.user_id = ?`;
+    }
+  } else if (boardId === 85) {
+    // 내가 좋아요한 게시글 조회 (여러 게시판의 게시글 포함)
+    boardIdCondition = 'WHERE 1 = 1'; // board_id 조건 제거
+    if (!userId) {
+      userBoardWhereCondition = 'AND 1 = 0';
+    } else {
+      userBoardJoinCondition = `INNER JOIN ${POST_REACTIONS_TABLE} AS pr ON p.post_id = pr.post_id AND pr.user_id = ? AND pr.reaction = 'like'`;
+    }
+  } else if (boardId === 86) {
+    // 내가 댓글단 게시글 조회 (여러 게시판의 게시글 포함)
+    boardIdCondition = 'WHERE 1 = 1'; // board_id 조건 제거
+    if (!userId) {
+      userBoardWhereCondition = 'AND 1 = 0';
+    } else {
+      userBoardJoinCondition = `INNER JOIN ${COMMENTS_TABLE} AS c ON p.post_id = c.post_id AND c.user_id = ?`;
+    }
+  }
+
+  // 정렬 조건 생성
+  let orderBy = '';
+  if (sortBy === 'likes') {
+    orderBy = 'ORDER BY p.like_count DESC, p.created_at DESC';
+  } else if (sortBy === 'comments') {
+    orderBy = 'ORDER BY p.comment_count DESC, p.created_at DESC';
+  } else if (sortBy === 'views') {
+    orderBy = 'ORDER BY p.view_count DESC, p.created_at DESC';
+  } else {
+    // latest (default)
+    orderBy = 'ORDER BY p.created_at DESC';
+  }
+
+  // 메인 조회 쿼리
+  // TODO: 성능 문제 발생 가능
+  const sql = `
+    SELECT
+      p.post_id,
+      p.title,
+      p.content,
+      p.is_anonymous,
+      p.like_count,
+      p.comment_count, -- TODO: 댓글 생성/삭제 시 comment_count 업데이트 로직 구현 필요
+      p.view_count,
+      p.created_at,
+      b.board_id,
+      b.name AS board_name,
+      u.user_id,
+      u.nickname AS user_nickname,
+      GROUP_CONCAT(DISTINCT t.tag_id ORDER BY t.tag_id) AS tag_ids,
+      GROUP_CONCAT(DISTINCT t.name ORDER BY t.tag_id) AS tag_names,
+      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'image' LIMIT 1) AS image_url,
+      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url
+    FROM ${POSTS_TABLE} AS p
+    LEFT JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
+    LEFT JOIN ${USERS_TABLE} AS u ON p.user_id = u.user_id
+    LEFT JOIN ${POST_TAGS_TABLE} AS pt ON p.post_id = pt.post_id
+    LEFT JOIN ${TAGS_TABLE} AS t ON pt.tag_id = t.tag_id
+    ${userBoardJoinCondition}
+    ${boardIdCondition}
+      AND p.status IN ('published', 'edited')
+      ${filterKeywordConditions}
+      ${boardFilterCondition}
+      ${userBoardWhereCondition}
+    GROUP BY p.post_id
+    ${orderBy}
+    LIMIT ? OFFSET ?
+  `;
+
+  // 게시글 목록 조회 - 쿼리 파라미터 구성
+  const queryParams: any[] = [];
+  
+  // board_id 조건이 필요한 경우 (일반 게시판)
+  if (boardId !== 3 && boardId !== 83 && boardId !== 84 && boardId !== 85 && boardId !== 86) {
+    queryParams.push(boardId);
+  }
+  
+  // JOIN 조건에 userId가 필요한 경우 파라미터 추가
+  if (boardId === 84 || boardId === 85 || boardId === 86) {
+    if (userId) {
+      queryParams.push(userId);
+    }
+  }
+  
+  // 필터 키워드 파라미터 추가
+  queryParams.push(...filterParams);
+  
+  // WHERE 조건에 userId가 필요한 경우 (board_id = 83)
+  // TODO: 하드 코딩 수정
+  if (boardId === 83 && userId) {
+    queryParams.push(userId);
+  }
+  
+  // 페이지네이션 파라미터 추가
+  queryParams.push(pageSize, offset);
+  const [rows] = await pool.query<BoardPostListRow[]>(sql, queryParams);
+  const posts = rows.map(toBoardPostListItem);
+
+  // 총 게시글 수 계산
+  const countSql = `
+    SELECT COUNT(DISTINCT p.post_id) AS total
+    FROM ${POSTS_TABLE} AS p
+    ${userBoardJoinCondition}
+    ${boardIdCondition}
+      AND p.status IN ('published', 'edited')
+      ${filterKeywordConditions}
+      ${boardFilterCondition}
+      ${userBoardWhereCondition}
+  `;
+
+  // COUNT 쿼리 파라미터 구성
+  const countParams: any[] = [];
+  
+  // board_id 조건이 필요한 경우 (일반 게시판)
+  if (boardId !== 3 && boardId !== 83 && boardId !== 84 && boardId !== 85 && boardId !== 86) {
+    countParams.push(boardId);
+  }
+  
+  // JOIN 조건에 userId가 필요한 경우 파라미터 추가
+  if (boardId === 84 || boardId === 85 || boardId === 86) {
+    if (userId) {
+      countParams.push(userId);
+    }
+  }
+  
+  // 필터 키워드 파라미터 추가
+  countParams.push(...filterParams);
+  
+  // WHERE 조건에 userId가 필요한 경우 (board_id = 83)
+  // TODO: 하드 코딩 수정
+  if (boardId === 83 && userId) {
+    countParams.push(userId);
+  }
+  const [countRows] = await pool.query<RowDataPacket[]>(countSql, countParams);
+  const totalResults = (countRows[0]?.total as number) || 0;
+  const totalPages = Math.ceil(totalResults / pageSize);
+
+  return {
+    boardInfo: {
+      id: board.boardId,
+      name: board.name,
+      description: board.description,
+    },
+    posts,
+    pagination: {
+      currentPage: page,
+      pageSize,
+      totalResults,
+      totalPages,
+    },
   };
 }
 
