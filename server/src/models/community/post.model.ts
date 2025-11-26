@@ -3,6 +3,7 @@ import { pool } from '../../config/db';
 import { findBoardById } from './board.model';
 import { findTagsByPostId } from './tag.model';
 import { findCommentsByPostId, findCommentReaction, COMMENTS_TABLE, COMMENT_REACTIONS_TABLE } from './comment.model';
+import { findFilterKeywordsByUserId } from './filter-keyword.model';
 import fs from 'fs/promises';
 import path from 'path';
 import {
@@ -20,6 +21,7 @@ const POLL_OPTIONS_TABLE = 'poll_option';
 const POST_REACTIONS_TABLE = 'post_reaction';
 const SCRAPS_TABLE = 'scrap';
 const POLL_VOTES_TABLE = 'poll_vote';
+const USERS_TABLE = 'user';
 
 // 첨부파일 입력 타입 정의
 // 첨부파일 입력 타입 정의
@@ -609,12 +611,19 @@ export interface PostDetailRow extends RowDataPacket {
   title: string;
   content: string;
   is_anonymous: 0 | 1;
+  status: string;
   like_count: number;
   dislike_count: number;
   comment_count: number;
   scrap_count: number;
+  view_count: number;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface UserRow extends RowDataPacket {
+  user_id: number;
+  nickname: string;
 }
 
 export interface AttachmentRow extends RowDataPacket {
@@ -639,7 +648,7 @@ export interface PollOptionRow extends RowDataPacket {
 }
 
 export interface UserVoteRow extends RowDataPacket {
-  poll_option_id: number; // poll_vote 테이블의 컬럼명
+  option_id: number; // poll_vote 테이블의 컬럼명
 }
 
 // 응답 타입 정의
@@ -651,6 +660,7 @@ export interface PostDetailResponse {
   };
   title: string;
   content: string;
+  status: string;
   author: {
     id: number;
     nickname: string;
@@ -660,6 +670,7 @@ export interface PostDetailResponse {
     createdAt: string;
     updatedAt: string;
   };
+  isEdited: boolean;
   counts: {
     likes: number;
     dislikes: number;
@@ -694,6 +705,7 @@ export interface PostDetailResponse {
   comments: Array<{
     id: number;
     content: string;
+    status: string;
     isSecret: boolean;
     isBlockedByFilter: boolean;
     author: {
@@ -713,6 +725,7 @@ export interface PostDetailResponse {
       reaction: 'like' | 'dislike' | null;
     };
     parentCommentId: number | null;
+    isEdited: boolean;
     replies: Array<any>;
   }>;
 }
@@ -727,19 +740,73 @@ async function findPostById(postId: number): Promise<PostDetailRow | null> {
       title,
       content,
       is_anonymous,
+      status,
       like_count,
       dislike_count,
       comment_count,
       scrap_count,
+      view_count,
       created_at,
       updated_at
     FROM ${POSTS_TABLE}
-    WHERE post_id = ?
+    WHERE post_id = ? AND status IN ('published', 'edited')
     LIMIT 1
   `;
 
   const [rows] = await pool.query<PostDetailRow[]>(sql, [postId]);
   return rows.length > 0 && rows[0] ? rows[0] : null;
+}
+
+// 작성자 정보 조회
+async function findUserById(userId: number): Promise<UserRow | null> {
+  const sql = `
+    SELECT user_id, nickname
+    FROM ${USERS_TABLE}
+    WHERE user_id = ?
+    LIMIT 1
+  `;
+
+  const [rows] = await pool.query<UserRow[]>(sql, [userId]);
+  return rows.length > 0 && rows[0] ? rows[0] : null;
+}
+
+// 조회수 증가 (중복 방지: 간단한 메모리 기반 캐시 사용)
+const viewCountCache = new Map<string, number>();
+const VIEW_COUNT_CACHE_TTL = 60 * 1000; // 1분
+
+// 조회수 증가 함수
+async function incrementPostViewCount(
+  postId: number,
+  userId: number | null,
+): Promise<void> {
+  // 캐시 키 생성 (사용자별 또는 IP별)
+  const cacheKey = userId ? `user:${userId}:post:${postId}` : `post:${postId}`;
+  const now = Date.now();
+  
+  // 캐시 확인
+  const lastViewTime = viewCountCache.get(cacheKey);
+  if (lastViewTime && now - lastViewTime < VIEW_COUNT_CACHE_TTL) {
+    // 1분 내 중복 조회는 무시
+    return;
+  }
+
+  // 조회수 증가
+  await pool.execute(
+    `UPDATE ${POSTS_TABLE} SET view_count = view_count + 1 WHERE post_id = ?`,
+    [postId],
+  );
+
+  // 캐시 업데이트
+  viewCountCache.set(cacheKey, now);
+
+  // 오래된 캐시 정리 (간단한 구현)
+  if (viewCountCache.size > 10000) {
+    const entries = Array.from(viewCountCache.entries());
+    const expiredKeys = entries
+      .filter(([_, time]) => now - time >= VIEW_COUNT_CACHE_TTL)
+      .map(([key]) => key);
+    expiredKeys.forEach((key) => viewCountCache.delete(key));
+  }
 }
 
 // 첨부파일 조회
@@ -791,14 +858,15 @@ async function findUserVote(pollId: number, userId: number | null): Promise<numb
   if (!userId) return null;
 
   const sql = `
-    SELECT poll_option_id
-    FROM ${POLL_VOTES_TABLE}
-    WHERE poll_id = ? AND user_id = ?
+    SELECT pv.option_id
+    FROM ${POLL_VOTES_TABLE} pv
+    INNER JOIN ${POLL_OPTIONS_TABLE} po ON pv.option_id = po.option_id
+    WHERE po.poll_id = ? AND pv.user_id = ?
     LIMIT 1
   `;
 
   const [rows] = await pool.query<UserVoteRow[]>(sql, [pollId, userId]);
-  return rows.length > 0 && rows[0] ? rows[0].poll_option_id : null;
+  return rows.length > 0 && rows[0] ? rows[0].option_id : null;
 }
 
 // 게시글 반응 조회
@@ -995,7 +1063,7 @@ export async function togglePostScrap(
   }
 }
 
-// 게시글 상세 조회 함수 (트랜잭션 통합 함수수)
+// 게시글 상세 조회 함수 (트랜잭션 통합 함수)
 export async function findPostDetailById(
   postId: number,
   currentUserId: number | null,
@@ -1004,13 +1072,17 @@ export async function findPostDetailById(
   const post = await findPostById(postId);
   if (!post) return null;
 
+  // 조회수 증가
+  await incrementPostViewCount(postId, currentUserId);
+
   // 게시판 정보 조회
   const board = await findBoardById(post.board_id);
   if (!board) return null;
 
-  // 작성자 정보 조회 (하드코딩)
+  // 작성자 정보 조회
+  const authorUser = await findUserById(post.user_id);
   const authorUserId = post.user_id;
-  const authorNickname = '사용자';
+  const authorNickname = authorUser?.nickname || '사용자';
 
   // 태그 조회
   const tags = await findTagsByPostId(postId);
@@ -1050,26 +1122,96 @@ export async function findPostDetailById(
     };
   }
 
+  // 사용자 필터 키워드 조회
+  const filterKeywords = currentUserId
+    ? await findFilterKeywordsByUserId(currentUserId)
+    : [];
+
   // 댓글 조회
   const comments = await findCommentsByPostId(postId, currentUserId, post.user_id);
 
-  // 댓글 계층 구조 구성
+  // 댓글 작성자 정보 조회 (한 번에 조회)
+  const commentUserIds = [...new Set(comments.map((c) => c.userId))];
+  const commentUsersMap = new Map<number, string>();
+  if (commentUserIds.length > 0) {
+    const placeholders = commentUserIds.map(() => '?').join(', ');
+    const [userRows] = await pool.query<UserRow[]>(
+      `SELECT user_id, nickname FROM ${USERS_TABLE} WHERE user_id IN (${placeholders})`,
+      commentUserIds,
+    );
+    userRows.forEach((user) => {
+      commentUsersMap.set(user.user_id, user.nickname);
+    });
+  }
+
+  // 댓글 계층 구조 구성 및 필터링
   const commentMap = new Map<number, any>();
   const rootComments: any[] = [];
 
+  // 비밀댓글 체크를 위한 맵 (부모가 비밀댓글이면 자식도 비밀댓글)
+  const secretCommentMap = new Map<number, boolean>();
+
+  // 먼저 모든 댓글의 비밀댓글 여부 결정
+  // 최상위 댓글은 직접 isSecret 설정 가능, 대댓글은 부모를 따라감
   for (const comment of comments) {
+    if (comment.parentCommentId === null) {
+      // 최상위 댓글만 isSecret 설정 가능
+      secretCommentMap.set(comment.id, comment.isSecret);
+    } else {
+      // 대댓글은 부모의 비밀댓글 여부를 따라감
+      // 부모가 아직 처리되지 않았을 수 있으므로, 나중에 다시 처리
+      secretCommentMap.set(comment.id, false); // 임시값
+    }
+  }
+
+  // 대댓글의 비밀댓글 여부를 부모로부터 결정
+  for (const comment of comments) {
+    if (comment.parentCommentId !== null) {
+      const parentIsSecret = secretCommentMap.get(comment.parentCommentId);
+      if (parentIsSecret !== undefined) {
+        // 부모가 비밀댓글이면 자식도 비밀댓글
+        secretCommentMap.set(comment.id, parentIsSecret);
+      }
+    }
+  }
+
+  // 모든 댓글 처리
+  for (const comment of comments) {
+    // 댓글 삭제 체크 (status가 'deleted'인 경우)
+    const isDeleted = comment.status === 'deleted';
+
+    // 비밀댓글 여부 (이미 결정됨)
+    const isSecret = secretCommentMap.get(comment.id) || false;
+
+    // 댓글 필터링 체크
+    let isBlockedByFilter = false;
+    if (!isDeleted && filterKeywords.length > 0) {
+      isBlockedByFilter = filterKeywords.some((keyword) =>
+        comment.content.includes(keyword.name),
+      );
+    }
+
+    // 댓글 작성자 정보
+    const commentUserNickname = commentUsersMap.get(comment.userId) || '사용자';
+
     const commentReaction = await findCommentReaction(comment.id, currentUserId);
+
+    // 댓글 수정 여부 확인 (status가 'edited'인 경우)
+    const isEdited = comment.status === 'edited';
 
     const commentData = {
       id: comment.id,
-      content: comment.content,
-      isSecret: comment.isSecret,
-      isBlockedByFilter: false, // TODO: 키워드 필터 로직 구현 필요
+      content: isDeleted
+        ? '삭제된 댓글입니다.'
+        : isBlockedByFilter
+          ? '사용자 설정에 의해 차단된 댓글입니다.'
+          : comment.content,
+      status: comment.status,
+      isSecret,
+      isBlockedByFilter,
       author: {
         id: comment.userId,
-        nickname: comment.isSecret
-          ? '익명'
-          : '사용자',
+        nickname: isSecret ? '익명' : commentUserNickname,
         isPostAuthor: comment.userId === post.user_id,
       },
       timestamps: {
@@ -1084,28 +1226,40 @@ export async function findPostDetailById(
         reaction: commentReaction,
       },
       parentCommentId: comment.parentCommentId,
+      isEdited,
       replies: [] as any[],
     };
 
     // 비밀 댓글 권한 체크
-    if (comment.isSecret && currentUserId !== post.user_id && currentUserId !== comment.userId) {
+    if (
+      isSecret &&
+      currentUserId !== post.user_id &&
+      currentUserId !== comment.userId
+    ) {
       commentData.content = '글쓴이와 댓글 작성자만 볼 수 있는 비밀 댓글입니다.';
     }
 
     commentMap.set(comment.id, commentData);
 
+    // 댓글 계층 구조 구성 (최대 2단계)
     if (comment.parentCommentId === null) {
+      // 최상위 댓글
       rootComments.push(commentData);
     } else {
+      // 대댓글 (2단계까지만 허용)
       const parent = commentMap.get(comment.parentCommentId);
       if (parent) {
         parent.replies.push(commentData);
       }
+      // 3단계 이상은 무시 (parent가 replies에 있는 경우는 이미 2단계)
     }
   }
 
   // 익명 처리
   const displayAuthorNickname = post.is_anonymous ? '익명' : authorNickname;
+
+  // 게시글 수정 여부 확인
+  const isEdited = post.status === 'edited';
 
   return {
     id: post.post_id,
@@ -1115,6 +1269,7 @@ export async function findPostDetailById(
     },
     title: post.title,
     content: post.content,
+    status: post.status,
     author: {
       id: authorUserId,
       nickname: displayAuthorNickname,
@@ -1124,6 +1279,7 @@ export async function findPostDetailById(
       createdAt: new Date(post.created_at).toISOString(),
       updatedAt: new Date(post.updated_at).toISOString(),
     },
+    isEdited,
     counts: {
       likes: post.like_count,
       dislikes: post.dislike_count,

@@ -11,6 +11,7 @@ export interface CommentRow extends RowDataPacket {
   post_id: number;
   user_id: number;
   content: string;
+  status: string;
   is_secret: 0 | 1;
   parent_comment_id: number | null;
   like_count: number;
@@ -25,6 +26,7 @@ export interface Comment {
   postId: number;
   userId: number;
   content: string;
+  status: string;
   isSecret: boolean;
   parentCommentId: number | null;
   likesCount: number;
@@ -39,6 +41,7 @@ export const toComment = (row: CommentRow): Comment => ({
   postId: row.post_id,
   userId: row.user_id,
   content: row.content,
+  status: row.status,
   isSecret: Boolean(row.is_secret),
   parentCommentId: row.parent_comment_id,
   likesCount: row.like_count,
@@ -59,6 +62,7 @@ export async function findCommentsByPostId(
       post_id,
       user_id,
       content,
+      status,
       is_secret,
       parent_comment_id,
       like_count,
