@@ -37,14 +37,17 @@ interface UpdatePostBody {
   // poll은 수정 불가
 }
 
+// 객체 검사 함수
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+// 게시판 ID 유효성 검사 함수
 function isValidBoardId(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
+// 문자열 검사 함수
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -100,7 +103,7 @@ function normalizeAttachments(
   return normalized.length > 0 ? normalized : undefined;
 }
 
-
+// 투표 정보 정리 및 검사 함수
 function normalizePoll(poll?: PollPayload | null): PollPayload | null {
   if (!poll) return null;
 
@@ -636,6 +639,7 @@ export async function updatePost(
 }
 
 // 게시글 상세 조회
+// TODO: 댓글 기능 구현 후 다시 검토
 // - 게시글 ID를 받아서 게시글 상세 정보를 반환하는 HTTP 핸들러
 export async function getPostDetail(
   req: Request,
