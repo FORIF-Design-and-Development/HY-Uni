@@ -2,9 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import { TimetableSetsModel } from "../../models/timetable/timetablesets.model";
 
 export const getAllSets = async (req: Request, res: Response, next: NextFunction) => {
-  try {
+ try {
     const rows = await TimetableSetsModel.getAllSets();
-    res.json({ success: true, data: rows });
+    res.json({ data: rows });
   } catch (err) {
     next(err);
   }

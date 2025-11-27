@@ -1,29 +1,52 @@
-import React from "react";
 import { useTimetableStore } from "../../store/timetable.store";
 
-const periodToTimeRange = (start: number, end: number) => {
-  const base = 9;
-  const s = base + (start - 1);
-  const e = base + (end - 1);
-  const toStr = (h: number) => `${String(h).padStart(2, "0")}:00`;
-  return `${toStr(s)} ~ ${toStr(e)}`;
-};
+const days = ["월", "화", "수", "목", "금", "토"];
+
+// "HH:MM:SS" → 0~30 슬롯
+function timeToSlot(time: any) {
+  if (!time || time === "-") return null;
+
+  // 숫자(period) 처리
+  if (typeof time === "number") {
+    return (time - 1) * 2; // 1교시 → 0, 2교시 → 2
+  }
+
+  if (typeof time !== "string" || !time.includes(":")) return null;
+
+  const [h, m] = time.split(":").map(Number);
+
+  if (h === 24 && m === 0) return 30;
+
+  return (h - 9) * 2 + (m >= 30 ? 1 : 0);
+}
+
+
+
+// ✅ slot → "09:00" format
+function slotToTime(slot: number) {
+  const totalMin = 9 * 60 + slot * 30;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+}
 
 export default function TimetableGrid() {
-  const {
-    selectedCourses,
-    incompleteCourses,
-    removeCourse,
-    removeIncomplete,
-  } = useTimetableStore();
+  const { selectedCourses, removeCourse, removeIncomplete } =
+    useTimetableStore();
 
-  const days = ["월", "화", "수", "목", "금", "토"];
-  const times = Array.from({ length: 15 }, (_, i) => i + 1);
+  const validCourses = selectedCourses.filter(
+    (c) =>
+      c.day && c.start_time != null && c.end_time != null
+  );
 
-  const getColor = (id: number) => {
-    const palette = ["#0E4A84", "#898C8E"];
-    return palette[id % 2]; // 간단한 색상 배정
-  };
+
+  const incomplete = selectedCourses.filter(
+    (c) =>
+      !c.day ||
+      !c.start_time ||
+      c.start_time === "-" ||
+      (typeof c.start_time === "string" && !c.start_time.includes(":"))
+  );
 
   return (
     <div
@@ -46,7 +69,7 @@ export default function TimetableGrid() {
         <thead>
           <tr style={{ backgroundColor: "#0E4A84", color: "#ffffff" }}>
             <th style={{ padding: 6, border: "1px solid #ECEFF1", width: 82 }}>
-              교시
+              시간
             </th>
             {days.map((d) => (
               <th key={d} style={{ padding: 6, border: "1px solid #ECEFF1" }}>
@@ -57,73 +80,87 @@ export default function TimetableGrid() {
         </thead>
 
         <tbody>
-          {times.map((t) => (
-            <tr key={t}>
-              <td
-                style={{
-                  border: "1px solid #ECEFF1",
-                  backgroundColor: "#F7F9FA",
-                  color: "#0E4A84",
-                  textAlign: "center",
-                  padding: 4,
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>{t}교시</div>
-                <div style={{ fontSize: 10, color: "#898C8E" }}>
-                  {periodToTimeRange(t, t)}
-                </div>
-              </td>
+          {Array.from({ length: 30 }, (_, slot) => (
+            <tr key={slot}>
+              {/* 교시(시간)정보 */}
+              {slot % 2 === 0 && (
+                <td
+                  rowSpan={2}
+                  style={{
+                    border: "1px solid #ECEFF1",
+                    backgroundColor: "#F7F9FA",
+                    color: "#0E4A84",
+                    textAlign: "center",
+                    padding: 4,
+                    width: 82
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>
+                    {slot / 2 + 1}교시
+                  </div>
+                  <div style={{ fontSize: 10, color: "#898C8E" }}>
+                    {slotToTime(slot)} ~ {slotToTime(slot + 2)}
+                  </div>
+                </td>
+              )}
+
+
 
               {days.map((day) => {
-                const startCourse = selectedCourses.find(
-                  (c) =>
-                    c.day === day && Number(c.start_time) === Number(t)
-                );
+                const course = validCourses.find((c) => {
+                  const s = timeToSlot(c.start_time);
+                  return c.day === day && s === slot;
+                });
 
-                const covered = selectedCourses.some(
-                  (c) =>
-                    c.day === day &&
-                    Number(c.start_time) < t &&
-                    Number(c.end_time) >= t
-                );
+                const covered = validCourses.some((c) => {
+                  const s = timeToSlot(c.start_time);
+                  const e = timeToSlot(c.end_time);
+                  return c.day === day && s! < slot && e! > slot;
+                });
 
                 if (covered) return null;
 
-                if (!startCourse) {
+                if (!course) {
                   return (
                     <td
-                      key={day}
+                      key={`${day}-${slot}`}
                       style={{
                         border: "1px solid #ECEFF1",
+                        height: 18,
                         backgroundColor: "#ffffff",
-                        height: 36,
                       }}
                     />
                   );
                 }
 
-                const span =
-                  Number(startCourse.end_time) -
-                  Number(startCourse.start_time) +
-                  1;
+                const s = timeToSlot(course.start_time)!;
+                const e = timeToSlot(course.end_time)!;
+                const span = e - s;
 
                 return (
                   <td
-                    key={day}
+                    key={`${day}-${slot}-${course.course_id}`}
                     rowSpan={span}
                     style={{
                       border: "1px solid #ECEFF1",
-                      backgroundColor: getColor(startCourse.id),
+                      backgroundColor: "#0E4A84",
                       color: "#ffffff",
                       position: "relative",
                       padding: 6,
                       fontSize: 11,
+                      height: 18 * span,
                     }}
                   >
                     <button
-                      onClick={() =>
-                        removeCourse(startCourse.id, startCourse.day)
-                      }
+                      onClick={() => {
+                        if (!window.confirm("해당 강의를 삭제하시겠습니까?")) return;
+                        removeCourse(
+                          course.course_id,
+                          course.day,
+                          course.start_time,
+                          course.end_time
+                        );
+                      }}
                       style={{
                         position: "absolute",
                         top: 4,
@@ -138,40 +175,24 @@ export default function TimetableGrid() {
                         fontSize: 12,
                       }}
                     >
-                      ×
+                      x
                     </button>
 
-                    <div style={{ fontWeight: 700, marginBottom: 2 }}>
-                      {startCourse.course_name}
-                    </div>
-                    <div style={{ marginBottom: 2 }}>
-                      {startCourse.professor_name || "-"}
-                    </div>
-
+                    <div style={{ fontWeight: 700 }}>{course.course_name}</div>
+                    <div>{course.professor || "-"}</div>
                     <div style={{ fontSize: 10 }}>
-                      {startCourse.day} {startCourse.start_time}~
-                      {startCourse.end_time}교시
-                      <br />
-                      {periodToTimeRange(
-                        Number(startCourse.start_time),
-                        Number(startCourse.end_time)
-                      )}
+                      {course.day}{" "}
+                      {typeof course.start_time === "string"
+                        ? course.start_time.slice(0, 5)
+                        : slotToTime(timeToSlot(course.start_time)!)}
+                      ~
+                      {typeof course.end_time === "string"
+                        ? course.end_time.slice(0, 5)
+                        : slotToTime(timeToSlot(course.end_time)!)}
                     </div>
 
-                    <div
-                      style={{
-                        marginTop: 4,
-                        padding: "3px 6px",
-                        borderRadius: 6,
-                        backgroundColor: "rgba(255,255,255,0.25)",
-                        fontSize: 10,
-                      }}
-                    >
-                      <div>{startCourse.location}</div>
-                      <div>
-                        {startCourse.major_division || "이수구분 없음"} ·{" "}
-                        {startCourse.credit ?? 0}학점
-                      </div>
+                    <div style={{ fontSize: 10, marginTop: 4 }}>
+                      {course.location}
                     </div>
                   </td>
                 );
@@ -179,7 +200,7 @@ export default function TimetableGrid() {
             </tr>
           ))}
 
-          {/* ===== 미지정 강의 ===== */}
+          {/* ✅ 미지정 */}
           <tr>
             <td
               colSpan={days.length + 1}
@@ -191,20 +212,11 @@ export default function TimetableGrid() {
               }}
             >
               <b style={{ color: "#0E4A84" }}>시간·요일 미지정 강의</b>
-
-              <div
-                style={{
-                  marginTop: 6,
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                }}
-              >
-                {incompleteCourses.length === 0 && (
+              <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
+                {incomplete.length === 0 && (
                   <span style={{ color: "#898C8E" }}>없음</span>
                 )}
-
-                {incompleteCourses.map((c, idx) => (
+                {incomplete.map((c, idx) => (
                   <span
                     key={idx}
                     onClick={() => removeIncomplete(idx)}
@@ -215,11 +227,9 @@ export default function TimetableGrid() {
                       cursor: "pointer",
                       backgroundColor: "#ffffff",
                       color: "#0E4A84",
-                      fontSize: 11,
                     }}
-                    title="클릭하면 제거됩니다."
                   >
-                    {c.course_name} ({c.professor_name || "-"})
+                    {c.course_name} ({c.professor || "-"})
                   </span>
                 ))}
               </div>

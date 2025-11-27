@@ -1,33 +1,41 @@
-import { Request, Response, NextFunction } from "express";
-import { TimetableSetsModel } from "../../models/timetable/timetablesets.model";
+import { pool } from "../../config/db";
 
-export const getAllSets = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const rows = await TimetableSetsModel.getAllSets();
-    res.json({ success: true, data: rows });
-  } catch (err) {
-    next(err);
-  }
-};
+export interface TimetableSet {
+  set_id: number;
+  name: string;
+}
 
-export const createSet = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const name = req.body.name;
+export interface CreateTimetableSetRequest {
+  name: string;
+}
 
-    await TimetableSetsModel.createSet(name);
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-};
+export interface TimetableSetListResponse {
+  sets: TimetableSet[];
+}
 
-export const deleteSet = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = Number(req.params.id);
+export const TimetableSetsModel = {
+  getAllSets: async (): Promise<any[]> => {
+    const [rows] = await pool.query(
+      `SELECT 
+        timetable_list_id AS timetable_list_id,
+        timetable_name AS timetable_name
+      FROM timetable_list
+      ORDER BY timetable_list_id`
+    );
+    return rows as any[];
+  },
 
-    await TimetableSetsModel.deleteSet(id);
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
+  createSet: async (name: string): Promise<void> => {
+    await pool.query(
+      "INSERT INTO timetable_list (timetable_name, user_id) VALUES (?, 2)",
+      [name]
+    );
+  },
+
+  deleteSet: async (id: number): Promise<void> => {
+    await pool.query(
+      "DELETE FROM timetable_list WHERE timetable_list_id = ?",
+      [id]
+    );
+  },
 };

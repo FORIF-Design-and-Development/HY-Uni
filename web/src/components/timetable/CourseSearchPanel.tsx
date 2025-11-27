@@ -1,5 +1,14 @@
-import React from "react";
+import { useState, useMemo } from "react";
 import { useTimetableStore } from "../../store/timetable.store";
+import { useNavigate } from "react-router-dom";
+
+export default function CourseSearchPanel() {
+  const navigate = useNavigate();
+
+  const goToReviews = (courseId: number) => {
+    navigate(`/reviews/${courseId}`);
+  };
+
 
 const DAY_ORDER: Record<string, number> = {
   월: 1,
@@ -10,24 +19,102 @@ const DAY_ORDER: Record<string, number> = {
   토: 6,
 };
 
-const periodToTimeRange = (start: number | null, end: number | null) => {
+const periodToTimeRange = (start: string | number | null, end: string | number | null) => {
   if (!start || !end) return "";
-  const base = 9;
-  const s = base + (start - 1);
-  const e = base + (end - 1);
 
-  const fmt = (h: number) => `${String(h).padStart(2, "0")}:00`;
-  return `${fmt(s)} ~ ${fmt(e)}`;
+  // DB 문자열 "13:30:00" 처리
+  const [sh, sm] =
+    typeof start === "string"
+      ? start.split(":").map(Number)
+      : [Number(start), 0];
+
+  const [eh, em] =
+    typeof end === "string"
+      ? end.split(":").map(Number)
+      : [Number(end), 0];
+
+  return `${String(sh).padStart(2,"0")}:${String(sm).padStart(2,"0")} ~ ${String(
+    eh
+  ).padStart(2,"0")}:${String(em).padStart(2,"0")}`;
 };
 
-export default function CourseSearchPanel() {
+
+function timeToPeriod(time: string | number | null) {
+  if (time == null) return null;
+
+  // ✅ 숫자면 그대로 교시로 처리 (병합된 데이터)
+  if (typeof time === "number") return time;
+
+  // ✅ 문자열 "13:00:00" 처리
+  if (typeof time === "string") {
+    if (!time.includes(":")) return null; // 안전장치
+
+    const [h, m] = time.split(":").map(Number);
+
+    // 기준 09:00 = 1교시
+    const base = 9;
+    let period = h - base + 1;
+
+    // 30분 → 반 교시
+    if (m >= 30) period += 0.5;
+
+    return period;
+  }
+
+  return null;
+}
   const {
     courses,
     filters,
     setFilters,
     searchCourses,
-    addCourse,
+    addCourse
   } = useTimetableStore();
+
+  // ✅ 입력 중 리렌더 방지용 로컬 상태
+  const [searchSubject, setSearchSubject] = useState(filters.subject);
+  const [searchProfessor, setSearchProfessor] = useState(filters.professor);
+
+  // ✅ debounce 적용
+  useMemo(() => {
+    const t = setTimeout(() => {
+      setFilters("subject", searchSubject);
+      setFilters("professor", searchProfessor);
+    }, 200);
+
+    return () => clearTimeout(t);
+  }, [searchSubject, searchProfessor]);
+
+  // ✅ 필터 + 정렬 + 검색 결과 계산 (메모이제이션)
+  const filteredCourses = useMemo(() => {
+    let list = [...courses];
+
+    if (filters.subject)
+      list = list.filter(c => c.course_name?.includes(filters.subject));
+
+    if (filters.professor)
+      list = list.filter(c => c.professor?.includes(filters.professor));
+
+    if (filters.year)
+      list = list.filter(c => c.required_grade == filters.year);
+
+    if (filters.type)
+      list = list.filter(c => c.major_division === filters.type);
+
+    if (filters.day)
+      list = list.filter(c => c.day === filters.day);
+
+    if (filters.sort === "요일순") {
+      list.sort((a, b) => {
+        const da = DAY_ORDER[a.day] || 99;
+        const db = DAY_ORDER[b.day] || 99;
+        if (da !== db) return da - db;
+        return (a.start_time || 99) - (b.start_time || 99);
+      });
+    }
+
+    return list;
+  }, [courses, filters]);
 
   return (
     <div
@@ -57,8 +144,8 @@ export default function CourseSearchPanel() {
       <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
         <input
           placeholder="교과목명"
-          value={filters.subject}
-          onChange={(e) => setFilters("subject", e.target.value)}
+          value={searchSubject}
+          onChange={(e) => setSearchSubject(e.target.value)}
           style={{
             flex: 1,
             padding: "6px 8px",
@@ -70,8 +157,8 @@ export default function CourseSearchPanel() {
         />
         <input
           placeholder="교수명"
-          value={filters.professor}
-          onChange={(e) => setFilters("professor", e.target.value)}
+          value={searchProfessor}
+          onChange={(e)=>setSearchProfessor(e.target.value)}
           style={{
             flex: 1,
             padding: "6px 8px",
@@ -83,7 +170,7 @@ export default function CourseSearchPanel() {
         />
       </div>
 
-      {/* 필터 3개 */}
+      {/* 필터 */}
       <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
         <select
           value={filters.year}
@@ -179,7 +266,7 @@ export default function CourseSearchPanel() {
           alignSelf: "flex-end",
         }}
       >
-        🔁 검색 새로고침
+        검색
       </button>
 
       {/* 결과 리스트 */}
@@ -192,7 +279,7 @@ export default function CourseSearchPanel() {
           marginTop: 4,
         }}
       >
-        {courses.length === 0 ? (
+        {filteredCourses.length === 0 ? (
           <div
             style={{
               paddingTop: 20,
@@ -204,100 +291,176 @@ export default function CourseSearchPanel() {
             검색 결과가 없습니다.
           </div>
         ) : (
-          courses
-            .slice()
-            .sort((a, b) => {
-              if (filters.sort === "요일순") {
-                const da = DAY_ORDER[a.day] || 99;
-                const db = DAY_ORDER[b.day] || 99;
-                if (da !== db) return da - db;
-                return (a.start_time || 99) - (b.start_time || 99);
-              }
-              return 0;
-            })
-            .map((c) => {
-              const hasTime =
-                c.day && c.start_time != null && c.end_time != null;
-              const periodText = hasTime
-                ? `${c.day} ${c.start_time}~${c.end_time}`
-                : "시간 미지정";
-              const timeText = hasTime
-                ? periodToTimeRange(
-                    Number(c.start_time),
-                    Number(c.end_time)
-                  )
-                : "";
+          filteredCourses.map((c) => {
+            const hasTime =
+              c.day &&
+              c.start_time &&
+              c.start_time !== "00:00:00" &&
+              c.start_time !== "-" &&
+              c.end_time &&
+              c.end_time !== "00:00:00" &&
+              c.end_time !== "-";
 
-              return (
+
+            const periodText = hasTime
+              ? `${c.day} ${c.start_time}~${c.end_time}`
+              : "시간 미지정";
+
+            const timeText = hasTime
+              ? periodToTimeRange(
+                  Number(c.start_time),
+                  Number(c.end_time)
+                )
+              : "";
+
+            return (
+              <div
+                key={`${c.course_id}-${c.day}-${c.start_time}-${c.end_time}`}
+                style={{
+                  border: "1px solid #ECEFF1",
+                  borderRadius: 10,
+                  padding: 8,
+                  marginBottom: 6,
+                  fontSize: 12,
+                  color: "#0E4A84",
+                  backgroundColor: "#F9FAFB",
+                }}
+              >
                 <div
-                  key={`${c.course_code}-${c.day}-${c.start_time || "X"}`}
                   style={{
-                    border: "1px solid #ECEFF1",
-                    borderRadius: 10,
-                    padding: 8,
-                    marginBottom: 6,
-                    fontSize: 12,
-                    color: "#0E4A84",
-                    backgroundColor: "#F9FAFB",
+                    fontWeight: 700,
+                    marginBottom: 2,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                   }}
                 >
-                  <div
+                  <span>{c.course_name}</span>
+                  <span
                     style={{
-                      fontWeight: 700,
-                      marginBottom: 2,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span>{c.course_name}</span>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: "#898C8E",
-                      }}
-                    >
-                      {c.credit}학점 · {c.major_division || "이수구분 없음"}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      marginBottom: 2,
                       fontSize: 11,
                       color: "#898C8E",
                     }}
                   >
-                    {c.professor_name || "-"} / {c.grade || "학년 정보 없음"}
-                  </div>
-                  <div
-                    style={{
-                      marginBottom: 4,
-                      fontSize: 11,
-                      color: "#0E4A84",
-                    }}
-                  >
-                    {periodText}
-                    {timeText && ` · ${timeText}`}
-                    {c.location && ` · ${c.location}`}
-                  </div>
-
-                  <button
-                    onClick={() => addCourse(c)}
-                    style={{
-                      padding: "4px 8px",
-                      borderRadius: 999,
-                      border: "none",
-                      backgroundColor: "#0E4A84",
-                      color: "#ffffff",
-                      fontSize: 11,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ➕ 시간표에 추가
-                  </button>
+                    {c.credit}학점 · {c.major_division || "이수구분 없음"}
+                  </span>
                 </div>
-              );
-            })
+
+                <div
+                  style={{
+                    marginBottom: 2,
+                    fontSize: 11,
+                    color: "#898C8E",
+                  }}
+                >
+                  {c.professor || "-"} / {c.required_grade ? `${c.required_grade}학년` : "-"}
+                </div>
+
+                <div
+                  style={{
+                    marginBottom: 4,
+                    fontSize: 11,
+                    color: "#0E4A84",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  {/* 시간 */}
+                  {hasTime ? (
+                  <span>
+                    {(() => {
+                      const startP = timeToPeriod(c.start_time);
+                      const endP = timeToPeriod(c.end_time);
+
+                      if (startP == null || endP == null) return "시간 미지정";
+
+                      return `${c.day} ${startP}~${endP - 1}교시 (${periodToTimeRange(c.start_time, c.end_time)})`;
+                    })()}
+                  </span>
+                ) : (
+                  <span>시간 미지정</span>
+                )}
+
+
+                  {/* 장소 */}
+                  {c.location && (
+                    <span>{c.location}</span>
+                  )}
+
+                  {/* 학과 정보 */}
+                  {(c.major_department || c.offering_department) && (
+                    <span>
+                      {c.major_department || "-"} · {c.offering_department || "-"}
+                    </span>
+                  )}
+                </div>
+
+
+                <button
+                  onClick={() => {
+                    const existing = useTimetableStore.getState().selectedCourses;
+
+                    const same = [
+                      ...existing,
+                      c
+                    ].filter(
+                      x =>
+                        x.course_code === c.course_code &&
+                        x.day === c.day &&
+                        x.professor === c.professor &&
+                        x.location === c.location &&
+                        x.start_time != null &&
+                        x.end_time != null
+                    );
+
+                   const minStart = Math.min(...same.map(x =>
+                      typeof x.start_time === "string"
+                        ? timeToPeriod(x.start_time)
+                        : x.start_time
+                    ));
+
+                    const maxEnd = Math.max(...same.map(x =>
+                      typeof x.end_time === "string"
+                        ? timeToPeriod(x.end_time)
+                        : x.end_time
+                    ));
+
+                    addCourse({
+                      ...c,
+                      start_time: minStart,
+                      end_time: maxEnd
+                    });
+                  }}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: 999,
+                    border: "none",
+                    backgroundColor: "#0E4A84",
+                    color: "#ffffff",
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  ➕ 시간표에 추가
+                </button>
+               <button
+                onClick={() => goToReviews(c.course_id)}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  border: "none",
+                  backgroundColor: "#0E4A84",
+                  color: "#ffffff",
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                ⭐ 강의평
+              </button>
+              </div>
+            );
+          })
         )}
       </div>
     </div>
