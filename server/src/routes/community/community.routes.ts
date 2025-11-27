@@ -34,6 +34,13 @@ import {
   getPreferredTagsHandler,
   getBoardTagsHandler,
 } from '../../controllers/community/preferred-tag.controller';
+import {
+  connectSSE,
+  getNotifications,
+  markAsRead,
+  markAllAsRead,
+  getUnreadCount,
+} from '../../controllers/community/notification.controller';
 
 // 게시판 라우트
 const router = Router();
@@ -115,6 +122,21 @@ router.post('/boards/:boardId/me/preferred-tags', addPreferredTagsHandler);
 
 // 게시판별 선호 태그 삭제
 router.delete('/boards/:boardId/me/preferred-tags', deletePreferredTagsHandler);
+
+// SSE 연결
+router.get('/notifications/stream', connectSSE);
+
+// 알림 목록 조회
+router.get('/notifications', getNotifications);
+
+// 모든 알림 읽음 처리 (동적 경로보다 먼저 배치)
+router.patch('/notifications/read-all', markAllAsRead);
+
+// 읽지 않은 알림 개수 (동적 경로보다 먼저 배치)
+router.get('/notifications/unread-count', getUnreadCount);
+
+// 알림 읽음 처리 (동적 경로는 마지막에 배치)
+router.patch('/notifications/:notificationId/read', markAsRead);
 
 export default router;
 
