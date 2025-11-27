@@ -7,7 +7,6 @@ import { searchPosts, type SortBy } from '../../models/community/search.model';
 const DEFAULT_LIMIT = 10;
 
 function parseLimit(limitParam: unknown): number {
-
   // 파라미터가 문자열이 아니면 DEFAULT_LIMIT 반환
   if (typeof limitParam !== 'string') {
     return DEFAULT_LIMIT;
@@ -73,7 +72,7 @@ export async function getPopularSearch(
     // 파라미터(인기 검색어 개수) 추출
     const limit = parseLimit(req.query.limit);
 
-    // 인기 검색어 목록 조회(개수 제한))
+    // 인기 검색어 목록 조회(개수 제한)
     const result = await findPopularSearchRankings(limit);
 
     // 응답 객체에 인기 검색어 목록 추가
@@ -223,6 +222,46 @@ export async function searchPostsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
+    // Authorization 헤더에서 JWT 토큰 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증 토큰이 필요합니다.',
+          code: 'MISSING_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // Bearer 토큰 추출
+    const token = authHeader.substring(7); // 'Bearer ' 제거
+
+    // 토큰 검증 및 user_id 추출
+    // TODO: middleware로 refactoring
+    let userId: number;
+    try {
+      const payload = verifyAccessToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
     // 검색어 파라미터 추출 및 검증
     // TODO: middleware로 refactoring
     const query = req.query.q;
@@ -286,12 +325,12 @@ export async function searchPostsHandler(
       }
     }
 
-    // 정렬 기준 파라미터 파싱
+    // 정렬 기준 파라미터 파싱 (기본값: relevance)
     const sortByParam = req.query.sortBy;
-    let sortBy: SortBy = 'latest';
+    let sortBy: SortBy = 'relevance';
     if (sortByParam) {
       const sortByValue = String(sortByParam);
-      if (sortByValue === 'relevance' || sortByValue === 'latest' || sortByValue === 'likes') {
+      if (sortByValue === 'relevance') {
         sortBy = sortByValue as SortBy;
       }
     }
@@ -312,6 +351,7 @@ export async function searchPostsHandler(
       page,
       pageSize,
       sortBy,
+      userId,
     };
     if (boardId !== undefined) {
       searchOptions.boardId = boardId;

@@ -87,18 +87,24 @@ export async function aggregatePopularSearch(
     );
 
     // 2. search_log에서 지난 periodHours 동안의 데이터 집계
+    // 서브쿼리로 먼저 집계한 후 ROW_NUMBER() 적용
     const sql = `
       INSERT INTO ${POPULAR_SEARCH_TABLE} (popular_rank, popular_query, count, base_time)
       SELECT 
-        ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as popular_rank,
-        query as popular_query,
-        COUNT(*) as count,
+        ROW_NUMBER() OVER (ORDER BY cnt DESC) as popular_rank,
+        popular_query,
+        cnt as count,
         ? as base_time
+      FROM (
+        SELECT 
+          query as popular_query,
+          COUNT(*) as cnt
       FROM search_log
       WHERE created_at >= DATE_SUB(?, INTERVAL ? HOUR)
       GROUP BY query
-      ORDER BY COUNT(*) DESC
+        ORDER BY cnt DESC
       LIMIT ?
+      ) AS ranked_queries
     `;
 
     await connection.query(sql, [baseTime, baseTime, periodHours, limit]);
