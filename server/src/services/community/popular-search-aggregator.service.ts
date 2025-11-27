@@ -1,11 +1,11 @@
 import { aggregatePopularSearch } from '../../models/community/popular-search.model';
 
-// baseTime을 정시로 정규화하는 함수 (분, 초, 밀리초를 0으로)
+// baseTime을 정시로 정규화하는 함수 (UTC 기준, 분, 초, 밀리초를 0으로)
 function normalizeToHour(baseTime: Date): Date {
   const normalized = new Date(baseTime);
-  normalized.setMinutes(0);
-  normalized.setSeconds(0);
-  normalized.setMilliseconds(0);
+  normalized.setUTCMinutes(0);
+  normalized.setUTCSeconds(0);
+  normalized.setUTCMilliseconds(0);
   return normalized;
 }
 
