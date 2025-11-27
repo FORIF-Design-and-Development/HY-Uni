@@ -71,3 +71,18 @@ export async function removeBoardSubscription(
   );
 }
 
+// 게시판 구독자 목록 조회
+export async function findBoardSubscribers(
+  boardId: number,
+): Promise<BoardSubscription[]> {
+  const [rows] = await pool.query<BoardSubscriptionRow[]>(
+    `
+      SELECT user_id, board_id, created_at
+      FROM ${BOARD_SUBSCRIPTION_TABLE}
+      WHERE board_id = ?
+    `.trim(),
+    [boardId],
+  );
+  return rows.map(toBoardSubscription);
+}
+
