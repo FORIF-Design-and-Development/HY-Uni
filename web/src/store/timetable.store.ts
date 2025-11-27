@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { timetableAPI } from "../api/timetable/timetable.api";
+import { timetableAPI } from "../api/campus/timetable.api";
 
 const delay = (ms = 200) => new Promise((res) => setTimeout(res, ms));
 

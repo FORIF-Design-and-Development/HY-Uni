@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { TimetableSetsModel } from "../../models/timetable/timetablesets.model";
+import { TimetableSetsModel } from "../../models/campus/timetablesets.model";
 
 export const getAllSets = async (req: Request, res: Response, next: NextFunction) => {
  try {

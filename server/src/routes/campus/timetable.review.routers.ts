@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getReviews, createReview } from "../../controllers/timetable/review.controller";
+import { getReviews, createReview } from "../../controllers/campus/timetable.review.controller";
 
 const router = Router();
 

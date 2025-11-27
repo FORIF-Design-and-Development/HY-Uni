@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_BASE_URL } from "../timetable/timetable.api";
+import { API_BASE_URL } from "./timetable.api";
 
 export const reviewAPI = {
   getReviews: (courseId: number) =>

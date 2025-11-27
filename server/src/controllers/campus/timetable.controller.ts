@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { TimetableModel } from "../../models/timetable/timetable.model";
+import { TimetableModel } from "../../models/campus/timetable.model";
 
 export const getTimetable = async (req: Request, res: Response, next: NextFunction) => {
   try {
