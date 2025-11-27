@@ -10,8 +10,8 @@ export interface Course {
   classification: string | null;
   required_grade: number | null;
   major_level: string | null;
-  start_time: number | null;
-  end_time: number | null;
+  start_time: string | null; 
+  end_time: string | null;
   day: string | null;
   location: string | null;
   credit: number | null;
@@ -97,16 +97,28 @@ export const CoursesModel = {
 
     const [rows] = await pool.query(sql, params);
 
-    const convertTimeToPeriod = (time: string | null) => {
-      if (!time) return null;
-      const [hour] = time.split(":").map(Number);
-      return hour - 8;
-    };
+    // ✅ 병합 로직 적용
+    const result: Course[] = [];
 
-    return (rows as any[]).map(row => ({
-      ...row,
-      start_time: convertTimeToPeriod(row.start_time),
-      end_time: convertTimeToPeriod(row.end_time),
-    })) as Course[];
+    for (const row of rows as any[]) {
+      const last = result[result.length - 1];
+
+      // ✅ 병합 조건
+      if (
+        last &&
+        last.course_code === row.course_code &&
+        last.course_name === row.course_name &&
+        last.professor === row.professor &&
+        last.day === row.day &&
+        last.location === row.location &&
+        last.end_time === row.start_time // ✅ 연속 시간
+      ) {
+        last.end_time = row.end_time; // ✅ 병합!
+      } else {
+        result.push({ ...row });
+      }
+    }
+
+    return result;
   },
 };

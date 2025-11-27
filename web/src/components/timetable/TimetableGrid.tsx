@@ -2,16 +2,16 @@ import { useTimetableStore } from "../../store/timetable.store";
 
 const days = ["월", "화", "수", "목", "금", "토"];
 
-// ✅ "HH:MM:SS" → 0~30 슬롯
+// "HH:MM:SS" → 0~30 슬롯
 function timeToSlot(time: any) {
-  if (
-    !time ||
-    time === "-" ||
-    typeof time !== "string" ||
-    !time.includes(":")
-  ) {
-    return null;
+  if (!time || time === "-") return null;
+
+  // 숫자(period) 처리
+  if (typeof time === "number") {
+    return (time - 1) * 2; // 1교시 → 0, 2교시 → 2
   }
+
+  if (typeof time !== "string" || !time.includes(":")) return null;
 
   const [h, m] = time.split(":").map(Number);
 
@@ -19,6 +19,7 @@ function timeToSlot(time: any) {
 
   return (h - 9) * 2 + (m >= 30 ? 1 : 0);
 }
+
 
 
 // ✅ slot → "09:00" format
@@ -35,22 +36,17 @@ export default function TimetableGrid() {
 
   const validCourses = selectedCourses.filter(
     (c) =>
-      c.start_time &&
-      typeof c.start_time === "string" &&
-      c.start_time.includes(":") &&
-      c.end_time &&
-      typeof c.end_time === "string" &&
-      c.end_time.includes(":")
+      c.day && c.start_time != null && c.end_time != null
   );
+
 
   const incomplete = selectedCourses.filter(
     (c) =>
+      !c.day ||
       !c.start_time ||
       c.start_time === "-" ||
-      typeof c.start_time !== "string" ||
-      !c.start_time.includes(":")
+      (typeof c.start_time === "string" && !c.start_time.includes(":"))
   );
-
 
   return (
     <div
@@ -185,8 +181,16 @@ export default function TimetableGrid() {
                     <div style={{ fontWeight: 700 }}>{course.course_name}</div>
                     <div>{course.professor || "-"}</div>
                     <div style={{ fontSize: 10 }}>
-                      {course.day} {course.start_time.slice(0,5)}~{course.end_time.slice(0,5)}
+                      {course.day}{" "}
+                      {typeof course.start_time === "string"
+                        ? course.start_time.slice(0, 5)
+                        : slotToTime(timeToSlot(course.start_time)!)}
+                      ~
+                      {typeof course.end_time === "string"
+                        ? course.end_time.slice(0, 5)
+                        : slotToTime(timeToSlot(course.end_time)!)}
                     </div>
+
                     <div style={{ fontSize: 10, marginTop: 4 }}>
                       {course.location}
                     </div>

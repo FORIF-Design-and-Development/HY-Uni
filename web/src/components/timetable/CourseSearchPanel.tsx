@@ -293,7 +293,14 @@ function timeToPeriod(time: string | number | null) {
         ) : (
           filteredCourses.map((c) => {
             const hasTime =
-              c.day && c.start_time != null && c.end_time != null;
+              c.day &&
+              c.start_time &&
+              c.start_time !== "00:00:00" &&
+              c.start_time !== "-" &&
+              c.end_time &&
+              c.end_time !== "00:00:00" &&
+              c.end_time !== "-";
+
 
             const periodText = hasTime
               ? `${c.day} ${c.start_time}~${c.end_time}`
@@ -360,13 +367,20 @@ function timeToPeriod(time: string | number | null) {
                   }}
                 >
                   {/* 시간 */}
-                  {c.day && c.start_time && c.end_time ? (
-                    <span>
-                      {c.day} {timeToPeriod(c.start_time)}~{timeToPeriod(c.end_time)}교시 ({periodToTimeRange(c.start_time, c.end_time)})
-                    </span>
-                  ) : (
-                    <span>시간 미지정</span>
-                  )}
+                  {hasTime ? (
+                  <span>
+                    {(() => {
+                      const startP = timeToPeriod(c.start_time);
+                      const endP = timeToPeriod(c.end_time);
+
+                      if (startP == null || endP == null) return "시간 미지정";
+
+                      return `${c.day} ${startP}~${endP - 1}교시 (${periodToTimeRange(c.start_time, c.end_time)})`;
+                    })()}
+                  </span>
+                ) : (
+                  <span>시간 미지정</span>
+                )}
 
 
                   {/* 장소 */}
@@ -400,8 +414,17 @@ function timeToPeriod(time: string | number | null) {
                         x.end_time != null
                     );
 
-                    const minStart = Math.min(...same.map(x => Number(x.start_time)));
-                    const maxEnd = Math.max(...same.map(x => Number(x.end_time)));
+                   const minStart = Math.min(...same.map(x =>
+                      typeof x.start_time === "string"
+                        ? timeToPeriod(x.start_time)
+                        : x.start_time
+                    ));
+
+                    const maxEnd = Math.max(...same.map(x =>
+                      typeof x.end_time === "string"
+                        ? timeToPeriod(x.end_time)
+                        : x.end_time
+                    ));
 
                     addCourse({
                       ...c,
