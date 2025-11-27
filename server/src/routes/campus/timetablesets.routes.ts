@@ -3,7 +3,7 @@ import {
   getAllSets,
   createSet,
   deleteSet,
-} from "../../controllers/timetable/timetablesets.controller";
+} from "../../controllers/campus/timetablesets.controller";
 
 const router = Router();
 

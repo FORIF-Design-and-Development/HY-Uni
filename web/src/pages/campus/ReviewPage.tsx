@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { reviewAPI } from "../../api/timetable/review.api";
+import { reviewAPI } from "../../api/campus/timetable.review.api";
 import { useTimetableStore } from "../../store/timetable.store";
 
 

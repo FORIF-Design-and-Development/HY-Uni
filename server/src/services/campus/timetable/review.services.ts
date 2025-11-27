@@ -1,4 +1,4 @@
-import { ReviewModel } from "../../../models/timetable/review.model";
+import { ReviewModel } from "../../../models/campus/timetable.review.model";
 
 export const ReviewService = {
   getReviews: (courseId: number) => {
