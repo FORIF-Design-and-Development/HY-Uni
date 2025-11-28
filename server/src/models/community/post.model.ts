@@ -2,7 +2,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/prom
 import { pool } from '../../config/db';
 import { findBoardById } from './board.model';
 import { findTagsByPostId } from './tag.model';
-import { findCommentsByPostId, findCommentReaction, COMMENTS_TABLE, COMMENT_REACTIONS_TABLE } from './comment.model';
+import { findCommentsByPostId, findCommentReaction, containsFilterKeyword, checkCommentExists, COMMENTS_TABLE, COMMENT_REACTIONS_TABLE } from './comment.model';
 import { findFilterKeywordsByUserId } from './filter-keyword.model';
 import { findPreferredKeywordsByUserId } from './preferred-keyword.model';
 import { findAllPreferredTagsByUserId } from './preferred-tag.model';
@@ -1160,6 +1160,13 @@ export async function findPostDetailById(
   // 댓글 조회
   const comments = await findCommentsByPostId(postId, currentUserId, post.user_id);
 
+  // 사용자의 필터링 키워드 조회 (로그인한 사용자만)
+  let filterKeywords: string[] = [];
+  if (currentUserId) {
+    const filterKeywordsWithId = await findFilterKeywordsByUserId(currentUserId); // 사용자 ID로 해당 사용자의 필터링 키워드 ID를를 조회
+    filterKeywords = filterKeywordsWithId.map((k) => k.name); // 필터링 키워드 배열 생성(필터링 키워드 ID를 필터링 키워드 이름으로 변환)
+  }
+
   // 댓글 계층 구조 구성
   const commentMap = new Map<number, any>();
   const rootComments: any[] = [];
@@ -1167,11 +1174,33 @@ export async function findPostDetailById(
   for (const comment of comments) {
     const commentReaction = await findCommentReaction(comment.id, currentUserId);
 
+    // 원본 댓글 정보 조회 (필터링 전 원본 content 확인용)
+    const originalComment = await checkCommentExists(comment.id);
+    const originalContent = originalComment ? originalComment.content : comment.content;
+
+    // 필터링 키워드 체크
+    let isBlockedByFilter = false;
+    let filteredContent = comment.content;
+
+    // 필터링 키워드 체크 조건:
+    // - status가 'active' 또는 'edited'인 댓글만 체크
+    // - status가 'deleted'인 댓글은 체크하지 않음
+    // - 비밀댓글도 체크 (권한이 있어서 원본 내용을 볼 수 있는 경우에도)
+    // - 자신이 작성한 댓글도 체크
+    if (
+      (comment.status === 'active' || comment.status === 'edited') &&
+      filterKeywords.length > 0 &&
+      containsFilterKeyword(originalContent, filterKeywords)
+    ) {
+      isBlockedByFilter = true;
+      filteredContent = '차단된 댓글입니다.';
+    }
+
     const commentData = {
       id: comment.id,
-      content: comment.content,
+      content: filteredContent,
       isSecret: comment.isSecret,
-      isBlockedByFilter: false, // TODO: 키워드 필터 로직 구현 필요
+      isBlockedByFilter,
       author: {
         id: comment.userId,
         nickname: comment.isSecret
@@ -1194,8 +1223,8 @@ export async function findPostDetailById(
       replies: [] as any[],
     };
 
-    // 비밀 댓글 권한 체크
-    if (comment.isSecret && currentUserId !== post.user_id && currentUserId !== comment.userId) {
+    // 비밀 댓글 권한 체크 (필터링 이후에 처리하여 필터링된 content를 덮어쓰지 않도록)
+    if (!isBlockedByFilter && comment.isSecret && currentUserId !== post.user_id && currentUserId !== comment.userId) {
       commentData.content = '글쓴이와 댓글 작성자만 볼 수 있는 비밀 댓글입니다.';
     }
 
