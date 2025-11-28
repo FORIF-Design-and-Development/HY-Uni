@@ -35,6 +35,13 @@ import {
   getBoardTagsHandler,
 } from '../../controllers/community/preferred-tag.controller';
 import {
+  createCommentHandler,
+  createReplyHandler,
+  toggleCommentReactionHandler,
+  updateCommentHandler,
+  deleteCommentHandler,
+} from '../../controllers/community/comment.controller';
+import {
   connectSSE,
   getNotifications,
   markAsRead,
@@ -77,6 +84,21 @@ router.post('/boards/:boardId/posts', createPost);
 
 // 게시글 상세 조회
 router.get('/posts/:postId', getPostDetail);
+
+// 댓글 작성
+router.post('/posts/:postId/comments', createCommentHandler);
+
+// 댓글 좋아요/싫어요 토글
+router.post('/comments/:commentId/reaction', toggleCommentReactionHandler);
+
+// 대댓글 작성
+router.post('/comments/:commentId/replies', createReplyHandler);
+
+// 댓글 수정
+router.patch('/comments/:commentId', updateCommentHandler);
+
+// 댓글 삭제
+router.delete('/comments/:commentId', deleteCommentHandler);
 
 // 게시글 수정
 router.patch('/posts/:postId', updatePost);
