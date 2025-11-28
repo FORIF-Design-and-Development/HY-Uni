@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { TimetableModel } from "../../models/timetable/timetable.model";
+import { TimetableModel } from "../../models/campus/timetable.model";
 
 export const getTimetable = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -20,12 +20,12 @@ export const resetTimetable = async (req: Request, res: Response, next: NextFunc
   try {
     const setId = Number(req.query.setId);
 
-    if (!setId) {
+    if (setId == null) {
       return res.status(400).json({ error: "setId is required" });
     }
 
     await TimetableModel.deleteTimetableBySet(setId);
-    res.json({ success: true });
+    res.json({ success: true});
   } catch (err) {
     next(err);
   }

@@ -3,7 +3,7 @@ import {
   getTimetable,
   resetTimetable,
   addCourseToTimetable,
-} from "../../controllers/timetable/timetable.controller";
+} from "../../controllers/campus/timetable.controller";
 
 const router = Router();
 

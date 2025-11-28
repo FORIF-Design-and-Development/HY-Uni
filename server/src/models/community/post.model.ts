@@ -6,6 +6,10 @@ import { findCommentsByPostId, findCommentReaction, containsFilterKeyword, check
 import { findFilterKeywordsByUserId } from './filter-keyword.model';
 import { findPreferredKeywordsByUserId } from './preferred-keyword.model';
 import { findAllPreferredTagsByUserId } from './preferred-tag.model';
+import {
+  notifyBoardSubscribers,
+  notifyPostReaction,
+} from '../../services/community/notification.service';
 import fs from 'fs/promises';
 import path from 'path';
 import {
@@ -527,6 +531,15 @@ export async function createPostWithRelations(
     }
 
     await connection.commit();
+
+    // 알림 발송 (트랜잭션 외부에서 실행)
+    try {
+      await notifyBoardSubscribers(payload.boardId, payload.userId, postId);
+    } catch (error) {
+      console.error('Failed to send notifications:', error);
+      // 알림 실패는 게시글 생성 실패로 처리하지 않음
+    }
+
     return { postId, status: 'published' }; 
   } catch (error) {
     await connection.rollback();
@@ -759,6 +772,18 @@ async function findPostById(postId: number): Promise<PostDetailRow | null> {
 
   const [rows] = await pool.query<PostDetailRow[]>(sql, [postId]);
   return rows.length > 0 && rows[0] ? rows[0] : null;
+}
+
+// 게시글 작성자 ID만 조회 (알림 발송용)
+export async function findPostAuthorId(postId: number): Promise<number | null> {
+  const sql = `
+    SELECT user_id
+    FROM ${POSTS_TABLE}
+    WHERE post_id = ?
+    LIMIT 1
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [postId]);
+  return rows.length > 0 && rows[0] ? rows[0].user_id : null;
 }
 
 // 첨부파일 조회
@@ -1003,6 +1028,16 @@ export async function togglePostReaction(
     );
 
     await connection.commit();
+
+    // 반응 추가 시에만 알림 발송 (취소/변경 시에는 발송하지 않음)
+    if (currentReaction === null && newReaction) {
+      try {
+        await notifyPostReaction(postId, userId);
+      } catch (error) {
+        console.error('Failed to send notification:', error);
+      }
+    }
+
     return {
       postId,
       likesCount: newLikeCount,
@@ -1088,6 +1123,16 @@ export async function togglePostScrap(
     );
 
     await connection.commit();
+
+    // 스크랩 추가 시에만 알림 발송
+    if (!isCurrentlyScrapped && isScrapped) {
+      try {
+        await notifyPostReaction(postId, userId); // 스크랩도 반응으로 처리
+      } catch (error) {
+        console.error('Failed to send notification:', error);
+      }
+    }
+
     return {
       postId,
       scrapCount: newScrapCount,

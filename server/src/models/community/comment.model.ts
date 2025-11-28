@@ -341,6 +341,30 @@ export async function createReply(
   }
 }
 
+// 댓글 ID로 댓글 조회
+// TODO: 댓글 기능 구현 후 개편필요
+export async function findCommentById(commentId: number): Promise<Comment | null> {
+  const sql = `
+    SELECT 
+      comment_id,
+      post_id,
+      user_id,
+      content,
+      is_secret,
+      parent_comment_id,
+      like_count,
+      dislike_count,
+      created_at,
+      updated_at
+    FROM ${COMMENTS_TABLE}
+    WHERE comment_id = ?
+    LIMIT 1
+  `;
+
+  const [rows] = await pool.query<CommentRow[]>(sql, [commentId]);
+  return rows.length > 0 && rows[0] ? toComment(rows[0]) : null;
+}
+
 // 댓글 반응 조회
 export async function findCommentReaction(
   commentId: number,

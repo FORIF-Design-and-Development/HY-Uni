@@ -1,5 +1,6 @@
 import type { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { findFilterKeywordsByUserId } from './filter-keyword.model';
 
 // DB 테이블 이름 상수
 const POSTS_TABLE = 'post';
@@ -10,7 +11,7 @@ const POST_TAGS_TABLE = 'post_tag';
 const ATTACHMENTS_TABLE = 'attachment';
 
 // 검색 옵션
-export type SortBy = 'relevance' | 'latest' | 'likes';
+export type SortBy = 'relevance';
 
 export interface SearchOptions {
   query: string;
@@ -18,6 +19,7 @@ export interface SearchOptions {
   pageSize: number;
   sortBy: SortBy;
   boardId?: number;
+  userId: number;
 }
 
 // 검색 결과 Row 타입
@@ -79,10 +81,10 @@ export interface SearchResponse {
   };
 }
 
-// content의 처음 100자를 추출하는 함수
+// content의 처음 15자를 추출하는 함수
 function extractContentSnippet(content: string): string {
   if (!content) return '';
-  return content.length > 100 ? content.substring(0, 100) : content;
+  return content.length > 15 ? content.substring(0, 15) : content;
 }
 
 // tag_ids와 tag_names 문자열을 파싱하여 배열로 변환
@@ -129,26 +131,39 @@ function toSearchResult(row: SearchResultRow): SearchResult {
 
 // 게시글 검색 함수
 export async function searchPosts(options: SearchOptions): Promise<SearchResponse> {
-  const { query, page, pageSize, sortBy, boardId } = options;
+  const { query, page, pageSize, sortBy, boardId, userId } = options;
   const offset = (page - 1) * pageSize;
   const searchTerm = `%${query}%`;
 
-  // 정렬 조건 생성
-  let orderBy = '';
-  if (sortBy === 'relevance') {
-    // 제목에 검색어 포함 우선, 그 다음 내용 포함
-    // TODO: 정렬(관련도) 조건 변경 가능
-    orderBy = `
-      ORDER BY
-        CASE WHEN p.title LIKE ? THEN 1 ELSE 2 END,
-        p.created_at DESC
-    `;
-  } else if (sortBy === 'likes') {
-    orderBy = 'ORDER BY p.like_count DESC, p.created_at DESC';
-  } else {
-    // latest (default)
-    orderBy = 'ORDER BY p.created_at DESC';
+  // 사용자의 필터 키워드 조회
+  const filterKeywordsWithId = await findFilterKeywordsByUserId(userId);
+  const filterKeywords = filterKeywordsWithId.map((k) => k.name);
+
+  // 필터 키워드 제외 조건 생성
+  let filterKeywordConditions = '';
+  const filterParams: any[] = [];
+  if (filterKeywords.length > 0) {
+    const conditions: string[] = [];
+    for (const keyword of filterKeywords) {
+      const keywordPattern = `%${keyword}%`;
+      conditions.push('(p.title NOT LIKE ? AND p.content NOT LIKE ?)');
+      filterParams.push(keywordPattern, keywordPattern);
+    }
+    if (conditions.length > 0) {
+      filterKeywordConditions = `AND ${conditions.join(' AND ')}`;
+    }
   }
+
+  // 정렬 조건 생성 (relevance: 제목 포함 우선, 그 다음 내용 포함, 각 그룹 내 최신순)
+  const orderBy = `
+    ORDER BY
+      CASE 
+        WHEN p.title LIKE ? THEN 1 
+        WHEN p.content LIKE ? THEN 2 
+        ELSE 3 
+      END,
+      p.created_at DESC
+  `;
 
   // boardId 필터 조건
   const boardFilter = boardId ? 'AND p.board_id = ?' : '';
@@ -177,9 +192,10 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
     LEFT JOIN ${USERS_TABLE} AS u ON p.user_id = u.user_id
     LEFT JOIN ${POST_TAGS_TABLE} AS pt ON p.post_id = pt.post_id
     LEFT JOIN ${TAGS_TABLE} AS t ON pt.tag_id = t.tag_id
-    WHERE p.status = 'published'
+    WHERE p.status IN ('published', 'edited')
       AND (p.title LIKE ? OR p.content LIKE ?)
       ${boardFilter}
+      ${filterKeywordConditions}
     GROUP BY p.post_id
     ${orderBy}
     LIMIT ? OFFSET ?
@@ -187,14 +203,14 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
 
   // 쿼리 파라미터 구성
   const params: any[] = [];
-  if (sortBy === 'relevance') {
-    params.push(searchTerm); // ORDER BY CASE의 LIKE 파라미터
-  }
+  params.push(searchTerm); // ORDER BY CASE의 title LIKE 파라미터
+  params.push(searchTerm); // ORDER BY CASE의 content LIKE 파라미터
   params.push(searchTerm); // WHERE title LIKE
   params.push(searchTerm); // WHERE content LIKE
   if (boardId) {
     params.push(boardId);
   }
+  params.push(...filterParams); // 필터 키워드 파라미터
   params.push(pageSize);
   params.push(offset);
 
@@ -206,15 +222,17 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
   const countSql = `
     SELECT COUNT(DISTINCT p.post_id) AS total
     FROM ${POSTS_TABLE} AS p
-    WHERE p.status = 'published'
+    WHERE p.status IN ('published', 'edited')
       AND (p.title LIKE ? OR p.content LIKE ?)
       ${boardFilter}
+      ${filterKeywordConditions}
   `;
 
   const countParams: any[] = [searchTerm, searchTerm];
   if (boardId) {
     countParams.push(boardId);
   }
+  countParams.push(...filterParams); // 필터 키워드 파라미터
 
   const [countRows] = await pool.query<RowDataPacket[]>(countSql, countParams);
   const totalResults = (countRows[0]?.total as number) || 0;

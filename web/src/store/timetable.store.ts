@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { timetableAPI } from "../api/timetable/timetable.api";
+import { timetableAPI } from "../api/campus/timetable.api";
 
 const delay = (ms = 200) => new Promise((res) => setTimeout(res, ms));
 
@@ -28,7 +28,7 @@ interface TimetableState {
   searchCourses: () => Promise<void>;
 
   addCourse: (course: any) => void;
-  removeCourse: (id: number, day: string) => void;
+  removeCourse: (id: number, day: string, start: number, end: number) => void;
   removeIncomplete: (index: number) => void;
 
   saveTimetable: () => Promise<void>;
@@ -42,6 +42,7 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
   selectedSet: null,
 
   courses: [],
+  
   selectedCourses: [],
   incompleteCourses: [],
 
@@ -62,10 +63,11 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
     set({ sets: data });
 
     if (data.length > 0 && !get().selectedSet) {
-      set({ selectedSet: data[0].set_id });
-      await get().loadTimetable(data[0].set_id);
+      set({ selectedSet: data[0].timetable_list_id });
+      await get().loadTimetable(data[0].timetable_list_id);
     }
   },
+
 
   createSet: async () => {
     const name = window.prompt("새 시간표 이름을 입력하세요");
@@ -92,20 +94,20 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
     const merged = mergeByCourseAndDay(
       raw.map((r: any) => ({
         id: r.course_id,
-        교과목명: r.교과목명,
-        교강사: r.교강사,
+        교과목명: r.course_name,
+        교강사: r.professor,
         요일: r.day,
-        시작교시: r.start_period,
-        종료교시: r.end_period,
-        강의실: r.강의실,
-        학점: r.학점,
-        이수구분: r.이수구분,
-        학년: r.학년,
+        시작교시: r.start_time,
+        종료교시: r.end_time,
+        강의실: r.location,
+        학점: r.credit,
+        이수구분: r.major_division,
+        권장학년: r.required_grade,
       }))
     );
 
-    const complete = merged.filter((c) => c.요일 && c.시작교시);
-    const incomplete = merged.filter((c) => !c.요일 || !c.시작교시);
+    const complete = merged.filter((c) => c.day && c.start_time);
+    const incomplete = merged.filter((c) => !c.day || !c.start_time);
 
     set({ selectedCourses: complete, incompleteCourses: incomplete });
   },
@@ -121,9 +123,11 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
 
   // ==================== 추가/삭제 ====================
   addCourse: (course) => {
-    if (!course.요일 || !course.시작교시) {
+    if (!course.day || !course.start_time) {
+      // 시간정보 없는 강의는 미지정 영역에 표시
       set((state) => ({
         incompleteCourses: [...state.incompleteCourses, course],
+        selectedCourses: [...state.selectedCourses, course],
       }));
       return;
     }
@@ -133,13 +137,20 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
     }));
   },
 
-  removeCourse: (id, day) => {
-    set((state) => ({
-      selectedCourses: state.selectedCourses.filter(
-        (c) => !(c.id === id && c.요일 === day)
-      ),
-    }));
-  },
+  removeCourse: (course_id, day, start, end) =>
+  set((state) => ({
+    selectedCourses: state.selectedCourses.filter(
+      (c) =>
+        !(
+          c.course_id === course_id &&
+          c.day === day &&
+          Number(c.start_time) >= Number(start) &&
+          Number(c.end_time) <= Number(end)
+        )
+    ),
+  })),
+
+
 
   removeIncomplete: (idx) => {
     set((state) => ({
@@ -158,10 +169,10 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
     for (const c of all) {
       await timetableAPI.saveCourse({
         setId,
-        courseId: c.id,
-        day: c.요일,
-        start: c.시작교시,
-        end: c.종료교시,
+        courseId: c.course_id,
+        day: c.day,
+        start: c.start_time,
+        end: c.end_time,
       });
       await delay(10);
     }
@@ -185,13 +196,13 @@ const DAY_ORDER: Record<string, number> = { 월: 1, 화: 2, 수: 3, 목: 4, 금:
 function mergeByCourseAndDay(rows: any[]): any[] {
   if (!rows || rows.length === 0) return [];
   const sorted = [...rows].sort((a, b) => {
-    if (a.교과목명 !== b.교과목명)
-      return a.교과목명.localeCompare(b.교과목명);
-    if (a.교강사 !== b.교강사)
-      return a.교강사.localeCompare(b.교강사);
-    if (a.요일 !== b.요일)
-      return (DAY_ORDER[a.요일] || 99) - (DAY_ORDER[b.요일] || 99);
-    return Number(a.시작교시) - Number(b.시작교시);
+    if (a.course_name !== b.course_name)
+      return a.course_name.localeCompare(b.course_name);
+    if (a.professor !== b.professor)
+      return a.professor.localeCompare(b.professor);
+    if (a.day !== b.day)
+      return (DAY_ORDER[a.day] || 99) - (DAY_ORDER[b.day] || 99);
+    return Number(a.start_time) - Number(b.start_time);
   });
 
   const merged: any[] = [];
@@ -200,12 +211,12 @@ function mergeByCourseAndDay(rows: any[]): any[] {
   for (const r of sorted) {
     if (
       cur &&
-      cur.교과목명 === r.교과목명 &&
-      cur.교강사 === r.교강사 &&
-      cur.요일 === r.요일 &&
-      Number(cur.종료교시) === Number(r.시작교시)
+      cur.course_name === r.course_name &&
+      cur.professor === r.professor &&
+      cur.day === r.day &&
+      Number(cur.end_time) === Number(r.start_time)
     ) {
-      cur.종료교시 = r.종료교시;
+      cur.end_time = r.end_time;
     } else {
       cur = { ...r };
       merged.push(cur);
@@ -213,3 +224,8 @@ function mergeByCourseAndDay(rows: any[]): any[] {
   }
   return merged;
 }
+
+if (typeof window !== "undefined") {
+  (window as any).useTimetableStore = useTimetableStore;
+}
+

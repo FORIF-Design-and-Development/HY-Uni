@@ -1,10 +1,12 @@
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage";
+import FindEmailTest from "./pages/auth/FindEmailTest.tsx";
 import LoginTest from "./pages/auth/LoginTest";
 import RegisterTest from "./pages/auth/RegisterTest";
-import FindEmailTest from "./pages/auth/FindEmailTest.tsx";
 import ResetPasswordTest from "./pages/auth/ResetPasswordTest.tsx";
+import { CafeteriaPage } from "./pages/campus/CafeteriaPage.tsx"; // ✅ 추가
 import NoticePage from "./pages/campus/NoticePage.tsx";
+import ReviewPage from "./pages/timetable/ReviewPage";
 import Timetable from "./pages/timetable/TimetablePage.tsx";
 
 export default function App() {
@@ -22,6 +24,8 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="/" element={<Navigate to="/campus/notice" replace />} />
         <Route path="/campus/notices" element={<NoticePage />} />
+        <Route path="/campus/cafeteria" element={<CafeteriaPage />} /> {/* ✅ 추가 */}
+        <Route path="/reviews/:courseId" element={<ReviewPage />} />
       </Routes>
     </BrowserRouter>
   );
