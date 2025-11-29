@@ -48,9 +48,13 @@ import {
   markAllAsRead,
   getUnreadCount,
 } from '../../controllers/community/notification.controller';
+import { getHomeData } from '../../controllers/community/home.controller';
 
 // 게시판 라우트
 const router = Router();
+
+// 홈 화면 데이터 조회
+router.get('/home', getHomeData);
 
 // 게시판 목록 조회
 router.get('/boards', getBoards);

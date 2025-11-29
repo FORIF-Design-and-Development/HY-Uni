@@ -1364,6 +1364,7 @@ interface BoardPostListRow extends RowDataPacket {
 export interface BoardPostListItem {
   id: number;
   title: string;
+  content: string; // 원본 content (contentPreview 생성용)
   contentSnippet: string;
   board: {
     id: number;
@@ -1415,6 +1416,15 @@ function extractContentSnippet(content: string): string {
   return content.length > 15 ? content.substring(0, 15) : content;
 }
 
+// contentPreview 생성 함수 (20자 제한, 말줄임표 추가)
+export function extractContentPreview(content: string): string {
+  if (!content) return ''; // content가 없으면 빈 문자열 반환
+  // HTML 태그 제거
+  const textContent = content.replace(/<[^>]*>/g, '');
+  if (textContent.length <= 20) return textContent; // textContent의 길이가 20자 이하면 textContent 반환
+  return textContent.substring(0, 20) + '...'; // textContent의 길이가 20자 초과면 20자까지 자르고 말줄임표 추가
+}
+
 // tag_ids와 tag_names 문자열을 파싱하여 배열로 변환
 function parseTags(tagIds: string | null, tagNames: string | null): Array<{ id: number; name: string }> {
   if (!tagIds || !tagNames) return [];
@@ -1433,6 +1443,7 @@ function toBoardPostListItem(row: BoardPostListRow): BoardPostListItem {
   return {
     id: row.post_id,
     title: row.title,
+    content: row.content, // 원본 content 저장
     contentSnippet: extractContentSnippet(row.content),
     board: {
       id: row.board_id,
@@ -1901,6 +1912,156 @@ export async function findPostsByBoardId(
       totalPages,
     },
   };
+}
+
+// 홈 화면용 추천 게시글 응답 타입
+export interface RecommendedPost {
+  id: number;
+  title: string;
+  contentPreview: string;
+  likesCount: number;
+  commentCount: number;
+  originalBoard: {
+    id: number;
+    name: string;
+  };
+  createdAt: string;
+}
+
+// BoardPostListItem[]를 RecommendedPost[]로 변환하는 헬퍼 함수
+export function convertBoardPostListToRecommendedPosts(
+  posts: BoardPostListItem[],
+): RecommendedPost[] {
+  return posts.map((post) => ({ // posts 배열을 순회하며 각 요소를 추출하여 새로운 배열로 반환
+    id: post.id,
+    title: post.title,
+    contentPreview: extractContentPreview(post.content),
+    likesCount: post.counts.likes,
+    commentCount: post.counts.comments,
+    originalBoard: {
+      id: post.board.id,
+      name: post.board.name,
+    },
+    createdAt: post.createdAt,
+  }));
+}
+
+// 사용자 선호 키워드/태그 기반 추천 게시글 조회 (findPostsByBoardId 재사용)
+export async function findRecommendedPostsByUserId(
+  userId: number,
+  limit: number = 10,
+): Promise<RecommendedPost[]> {
+  // findPostsByBoardId를 boardId=2(추천 게시판)로 호출하여 추천 게시글 조회
+  const response = await findPostsByBoardId({
+    boardId: 2,
+    page: 1,
+    pageSize: limit,
+    sortBy: 'latest',
+    userId,
+  });
+
+  // BoardPostListItem[]를 RecommendedPost[]로 변환
+  return convertBoardPostListToRecommendedPosts(response.posts);
+}
+
+// 특정 게시판의 최신 게시글 1개 조회
+export async function findLatestPostByBoardId(
+  boardId: number,
+): Promise<RecommendedPost | null> {
+  const sql = `
+    SELECT
+      p.post_id,
+      p.title,
+      p.content,
+      p.like_count,
+      p.comment_count,
+      p.created_at,
+      b.board_id,
+      b.name AS board_name
+    FROM ${POSTS_TABLE} AS p
+    INNER JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
+    WHERE p.board_id = ?
+      AND p.status IN ('published', 'edited')
+    ORDER BY p.created_at DESC
+    LIMIT 1
+  `;
+
+  interface LatestPostRow extends RowDataPacket { // MySQL이 반환한 RowDataPacket을 테이블 스키마에 맞춰 표현한 타입(= 원본 DB 레코드 형태).
+    post_id: number;
+    title: string;
+    content: string;
+    like_count: number;
+    comment_count: number;
+    created_at: Date;
+    board_id: number;
+    board_name: string;
+  }
+
+  const [rows] = await pool.query<LatestPostRow[]>(sql, [boardId]); // sql 쿼리 실행 결과를 LatestPostRow 배열로 반환
+
+  if (rows.length === 0 || !rows[0]) {
+    return null;
+  }
+
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+  
+  return {
+    id: row.post_id,
+    title: row.title,
+    contentPreview: extractContentPreview(row.content),
+    likesCount: row.like_count,
+    commentCount: row.comment_count,
+    originalBoard: {
+      id: row.board_id,
+      name: row.board_name,
+    },
+    createdAt: new Date(row.created_at).toISOString(), 
+  };
+}
+
+// 즐겨찾기 게시판과 최신 게시글 조회 응답 타입
+export interface FavoriteBoardWithLatestPost {
+  id: number;
+  name: string;
+  latestPost: {
+    id: number;
+    title: string;
+    contentPreview: string;
+    likesCount: number;
+    commentCount: number;
+    createdAt: string;
+  } | null;
+}
+
+// 즐겨찾기 게시판과 최신 게시글 조회
+export async function findFavoriteBoardsWithLatestPost(
+  favoriteBoards: Array<{ id: number; name: string; createdAt: Date }>,
+): Promise<FavoriteBoardWithLatestPost[]> {
+  const result: FavoriteBoardWithLatestPost[] = [];
+
+  for (const board of favoriteBoards) { // 즐겨찾기 게시판의 각 요소를 순회
+    const latestPost = await findLatestPostByBoardId(board.id); // 즐겨찾기 게시판의 최신 게시글 조회
+    
+    result.push({
+      id: board.id,
+      name: board.name,
+      latestPost: latestPost
+        ? {
+            id: latestPost.id,
+            title: latestPost.title,
+            contentPreview: latestPost.contentPreview,
+            likesCount: latestPost.likesCount,
+            commentCount: latestPost.commentCount,
+            createdAt: latestPost.createdAt,
+          }
+        : null,
+    });
+  }
+
+  return result;
 }
 
 

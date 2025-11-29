@@ -71,3 +71,49 @@ export async function removeBoardFavorite(
   );
 }
 
+// 즐겨찾기 게시판 응답 타입
+export interface FavoriteBoardWithLatestPost {
+  id: number;
+  name: string;
+  latestPost: {
+    id: number;
+    title: string;
+    contentPreview: string;
+    likesCount: number;
+    commentCount: number;
+    createdAt: string;
+  } | null;
+}
+
+// 사용자의 즐겨찾기 게시판 목록 조회 (created_at 기준 정렬)
+export async function findFavoriteBoardsByUserId(
+  userId: number,
+  limit: number = 5,
+): Promise<Array<{ id: number; name: string; createdAt: Date }>> {
+  const sql = `
+    SELECT
+      b.board_id,
+      b.name,
+      bf.created_at
+    FROM ${BOARD_FAVORITES_TABLE} AS bf
+    INNER JOIN board AS b ON bf.board_id = b.board_id
+    WHERE bf.user_id = ?
+    ORDER BY bf.created_at ASC
+    LIMIT ?
+  `;
+
+  interface FavoriteBoardRow extends RowDataPacket {
+    board_id: number;
+    name: string;
+    created_at: Date;
+  }
+
+  const [rows] = await pool.query<FavoriteBoardRow[]>(sql, [userId, limit]); // sql 쿼리 실행 결과를 FavoriteBoardRow 배열로 반환
+
+  return rows.map((row) => ({ // rows 배열을 순회하며 각 요소를 추출하여 새로운 배열로 반환
+    id: row.board_id, // row.board_id를 id 프로퍼티에 할당
+    name: row.name, // row.name을 name 프로퍼티에 할당
+    createdAt: new Date(row.created_at), // row.created_at를 createdAt 프로퍼티에 할당
+  }));
+}
+
