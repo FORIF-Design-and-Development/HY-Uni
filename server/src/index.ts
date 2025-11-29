@@ -54,17 +54,6 @@ const aggregatePeriodHours = Number(process.env.POPULAR_SEARCH_AGGREGATE_PERIOD_
 const aggregateLimit = Number(process.env.POPULAR_SEARCH_AGGREGATE_LIMIT || 10);
 
 if (aggregateEnabled) {
-  // 서버 시작 시 즉시 한 번 실행
-  (async () => {
-    try {
-      const baseTime = new Date();
-      await runAggregation(baseTime, aggregatePeriodHours, aggregateLimit);
-      console.log('인기 검색어 초기 집계 완료');
-    } catch (error) {
-      console.error('인기 검색어 초기 집계 실패:', error);
-    }
-  })();
-
   // 정기 스케줄러 등록
   cron.schedule(aggregateCron, async () => {
     try {

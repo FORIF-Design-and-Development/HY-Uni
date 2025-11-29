@@ -8,11 +8,11 @@ import { noticeRoutes } from './campus/notice.routes';
 import { placeRoutes } from './campus/place.routes';
 import seatsRoutes from './campus/seats.routes';
 import communityRoutes from './community/community.routes';
-import coursesRoutes from './timetable/courses.routes';
-import timetableRoutes from './timetable/timetable.routes';
-import timetablesetsRoutes from './timetable/timetablesets.routes';
+import coursesRoutes from './campus/courses.routes';
+import timetableRoutes from './campus/timetable.routes';
+import timetablesetsRoutes from './campus/timetablesets.routes';
 import calendarRoutes from './campus/calendar.routes';
-import reviewRouter from "./timetable/review.routers"; 
+import reviewRouter from './campus/timetable.review.routers'; 
 
 
 export function registerRoutes(app: Express) {
