@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../../config/jwt';
 import {
   findUnreadNotificationsByUserId,
   findNotificationsByUserId,
@@ -19,18 +18,7 @@ export async function connectSSE(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      res.status(401).json({
-        data: null,
-        error: { message: '인증이 필요합니다.', code: 'UNAUTHORIZED' },
-        meta: null,
-      });
-      return;
-    }
-
-    const decoded = verifyAccessToken(token);
-    const userId = decoded.userId;
+    const userId = (req as any).userId;
 
     // SSE 연결 등록
     registerSSEConnection(userId, res);
@@ -51,18 +39,7 @@ export async function getNotifications(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      res.status(401).json({
-        data: null,
-        error: { message: '인증이 필요합니다.', code: 'UNAUTHORIZED' },
-        meta: null,
-      });
-      return;
-    }
-
-    const decoded = verifyAccessToken(token);
-    const userId = decoded.userId;
+    const userId = (req as any).userId;
 
     const limit = req.query.limit ? Number(req.query.limit) : 50;
     const offset = req.query.offset ? Number(req.query.offset) : 0;
@@ -119,18 +96,7 @@ export async function markAsRead(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      res.status(401).json({
-        data: null,
-        error: { message: '인증이 필요합니다.', code: 'UNAUTHORIZED' },
-        meta: null,
-      });
-      return;
-    }
-
-    const decoded = verifyAccessToken(token);
-    const userId = decoded.userId;
+    const userId = (req as any).userId;
 
     const notificationId = Number(req.params.notificationId);
     if (isNaN(notificationId)) {
@@ -175,18 +141,7 @@ export async function markAllAsRead(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      res.status(401).json({
-        data: null,
-        error: { message: '인증이 필요합니다.', code: 'UNAUTHORIZED' },
-        meta: null,
-      });
-      return;
-    }
-
-    const decoded = verifyAccessToken(token);
-    const userId = decoded.userId;
+    const userId = (req as any).userId;
 
     const count = await markAllNotificationsAsRead(userId);
 
@@ -210,18 +165,7 @@ export async function getUnreadCount(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      res.status(401).json({
-        data: null,
-        error: { message: '인증이 필요합니다.', code: 'UNAUTHORIZED' },
-        meta: null,
-      });
-      return;
-    }
-
-    const decoded = verifyAccessToken(token);
-    const userId = decoded.userId;
+    const userId = (req as any).userId;
 
     const count = await getUnreadNotificationCount(userId);
 
