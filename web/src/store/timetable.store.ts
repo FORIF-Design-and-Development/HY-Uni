@@ -58,14 +58,26 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
   // ==================== 세트 ====================
   loadSets: async () => {
     const res = await timetableAPI.getSets();
-    const data = res.data.data || [];
+    let data = res.data.data || [];
 
-    set({ sets: data });
-
-    if (data.length > 0 && !get().selectedSet) {
-      set({ selectedSet: data[0].timetable_list_id });
-      await get().loadTimetable(data[0].timetable_list_id);
+    // 세트가 없는 경우 기본 세트 자동 생성
+    if (data.length == 0) {
+      await timetableAPI.createSet("2025-2");
+      const reload = await timetableAPI.getSets();
+      data = reload.data.data || [];
     }
+
+    // 세트 상태에 저장
+        set({ sets: data });
+
+    // 선택된 set가 없으면 기본 set 설정 + loadtimetable호출
+    if (data.length > 0 && !get().selectedSet) {
+      const first = data[0].timetable_list_id;
+      set({ selectedSet : first });
+      await get().loadTimetable(first);
+    }
+
+    return data;
   },
 
 

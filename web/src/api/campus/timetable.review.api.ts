@@ -1,10 +1,11 @@
-import axios from "axios";
-import { API_BASE_URL } from "./timetable.api";
+import { api } from "../axios";
 
 export const reviewAPI = {
+  // 강의별 리뷰 조회
   getReviews: (courseId: number) =>
-    axios.get(`${API_BASE_URL}/reviews/${courseId}`),
+    api.get(`/reviews/${courseId}`),
 
+  // 리뷰 작성
   createReview: (data: any) =>
-    axios.post(`${API_BASE_URL}/reviews`, data),
+    api.post(`/reviews`, data),
 };
