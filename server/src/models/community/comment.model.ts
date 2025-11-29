@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../../config/db';
+import { notifyCommentReaction } from '../../services/community/notification.service';
 
 // DB 테이블 이름을 상수로 관리
 export const COMMENTS_TABLE = 'comment';
@@ -19,6 +20,7 @@ export interface CommentRow extends RowDataPacket {
   created_at: Date;
   updated_at: Date;
   status: 'active' | 'edited' | 'deleted' | 'blocked';
+  user_nickname?: string | null;
 }
 
 // 애플리케이션 내부에서 사용할 도메인 모델(카멜 케이스 필드 등으로 정규화된 형태).
@@ -35,6 +37,7 @@ export interface Comment {
   createdAt: Date;
   updatedAt: Date;
   status: 'active' | 'edited' | 'deleted' | 'blocked';
+  userNickname?: string | null;
 }
 
 // 댓글 생성 요청 페이로드 타입 정의
@@ -108,6 +111,7 @@ export const toComment = (row: CommentRow): Comment => ({
   createdAt: new Date(row.created_at),
   updatedAt: new Date(row.updated_at),
   status: row.status,
+  userNickname: row.user_nickname || null,
 });
 
 // 댓글 내용에 필터링 키워드가 포함되어 있는지 확인하는 함수
@@ -131,23 +135,25 @@ export async function findCommentsByPostId(
 ): Promise<Comment[]> {
   const sql = `
     SELECT 
-      comment_id,
-      post_id,
-      user_id,
-      content,
-      is_anonymous,
-      is_secret,
-      parent_comment_id,
-      like_count,
-      dislike_count,
-      created_at,
-      updated_at,
-      status
-    FROM ${COMMENTS_TABLE}
-    WHERE post_id = ?
+      c.comment_id,
+      c.post_id,
+      c.user_id,
+      c.content,
+      c.is_anonymous,
+      c.is_secret,
+      c.parent_comment_id,
+      c.like_count,
+      c.dislike_count,
+      c.created_at,
+      c.updated_at,
+      c.status,
+      u.nickname AS user_nickname
+    FROM ${COMMENTS_TABLE} AS c
+    LEFT JOIN user AS u ON c.user_id = u.user_id
+    WHERE c.post_id = ?
     ORDER BY 
-      CASE WHEN parent_comment_id IS NULL THEN comment_id ELSE parent_comment_id END,
-      comment_id ASC
+      CASE WHEN c.parent_comment_id IS NULL THEN c.comment_id ELSE c.parent_comment_id END,
+      c.comment_id ASC
   `;
 
   const [rows] = await pool.query<CommentRow[]>(sql, [postId]);
@@ -342,7 +348,6 @@ export async function createReply(
 }
 
 // 댓글 ID로 댓글 조회
-// TODO: 댓글 기능 구현 후 개편필요
 export async function findCommentById(commentId: number): Promise<Comment | null> {
   const sql = `
     SELECT 
@@ -350,12 +355,14 @@ export async function findCommentById(commentId: number): Promise<Comment | null
       post_id,
       user_id,
       content,
+      is_anonymous,
       is_secret,
       parent_comment_id,
       like_count,
       dislike_count,
       created_at,
-      updated_at
+      updated_at,
+      status
     FROM ${COMMENTS_TABLE}
     WHERE comment_id = ?
     LIMIT 1
@@ -463,6 +470,16 @@ export async function toggleCommentReaction(
     );
 
     await connection.commit();
+
+    // 반응 추가 시에만 알림 발송 (취소/변경 시에는 발송하지 않음)
+    if (currentReaction === null && newReaction) {
+      try {
+        await notifyCommentReaction(commentId, userId);
+      } catch (error) {
+        console.error('Failed to send notification:', error);
+      }
+    }
+
     return {
       commentId,
       likesCount: newLikeCount,

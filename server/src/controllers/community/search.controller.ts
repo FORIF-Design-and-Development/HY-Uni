@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from 'express';
-import { verifyAccessToken } from '../../config/jwt';
 import { findPopularSearchRankings } from '../../models/community/popular-search.model';
 import { createSearchLog } from '../../models/community/search-log.model';
 import { searchPosts, type SortBy } from '../../models/community/search.model';
@@ -31,44 +30,6 @@ export async function getPopularSearch(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증
-    // TODO: middleware로 refactoring
-    try {
-      verifyAccessToken(token);
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
     // 파라미터(인기 검색어 개수) 추출
     const limit = parseLimit(req.query.limit);
 
@@ -98,35 +59,7 @@ export async function logSearch(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출 (optional)
-    let userId: number | null = null;
-    const authHeader = req.headers.authorization;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Bearer 토큰 추출
-      const token = authHeader.substring(7); // 'Bearer ' 제거
-      
-      // 토큰 검증 및 user_id 추출
-      try {
-        const payload = verifyAccessToken(token);
-        userId = payload.userId;
-      } catch (error) {
-        // TODO: middleware로 refactoring
-        // 토큰이 유효하지 않으면 에러 반환
-        res.status(401).json({
-          data: null,
-          error: {
-            message: '유효하지 않은 인증 토큰입니다.',
-            code: 'INVALID_TOKEN',
-          },
-          meta: {
-            timestamp: new Date().toISOString(),
-          },
-        });
-        return;
-      }
-    }
+    const userId = (req as any).userId;
 
     // Request body에서 query 추출
     const { query } = req.body;
@@ -222,45 +155,7 @@ export async function searchPostsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 검색어 파라미터 추출 및 검증
     // TODO: middleware로 refactoring
