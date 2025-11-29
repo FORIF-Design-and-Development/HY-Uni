@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../../config/jwt';
 import {
   checkPostExists,
   createComment,
@@ -8,6 +7,7 @@ import {
   updateComment,
   deleteComment,
 } from '../../models/community/comment.model';
+import { notifyPostAuthor, notifyCommentAuthor } from '../../services/community/notification.service';
 
 // 댓글 생성 요청 본문(바디) 데이터 필드 정의
 interface CreateCommentBody {
@@ -57,45 +57,7 @@ export async function createCommentHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'MISSING_TOKEN',
-          message: '인증 토큰이 필요합니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: '유효하지 않은 인증 토큰입니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시글 ID 파라미터 추출 및 검증
     const postId = Number.parseInt(req.params.postId ?? '', 10);
@@ -194,6 +156,14 @@ export async function createCommentHandler(
       isSecret,
     });
 
+    // 댓글 생성 성공 시 게시글 작성자에게 알림 발송
+    try {
+      await notifyPostAuthor(postId, userId, result.commentId);
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+      // 알림 실패는 메인 로직에 영향 없도록 에러를 던지지 않음
+    }
+
     // 댓글 생성 성공 시 201 응답
     res.status(201).json({
       data: {
@@ -217,45 +187,7 @@ export async function toggleCommentReactionHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'MISSING_TOKEN',
-          message: '인증 토큰이 필요합니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: '유효하지 않은 인증 토큰입니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 댓글 ID 파라미터 추출 및 검증
     const commentId = Number.parseInt(req.params.commentId ?? '', 10);
@@ -377,45 +309,7 @@ export async function createReplyHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'MISSING_TOKEN',
-          message: '인증 토큰이 필요합니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: '유효하지 않은 인증 토큰입니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 댓글 ID 파라미터 추출 및 검증
     const commentId = Number.parseInt(req.params.commentId ?? '', 10);
@@ -499,6 +393,14 @@ export async function createReplyHandler(
         isSecret,
       });
 
+      // 대댓글 생성 성공 시 댓글 작성자에게 알림 발송
+      try {
+        await notifyCommentAuthor(commentId, userId, result.commentId);
+      } catch (error) {
+        console.error('Failed to send notification:', error);
+        // 알림 실패는 메인 로직에 영향 없도록 에러를 던지지 않음
+      }
+
       // 대댓글 생성 성공 시 201 응답
       res.status(201).json({
         data: {
@@ -552,45 +454,7 @@ export async function updateCommentHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'MISSING_TOKEN',
-          message: '인증 토큰이 필요합니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: '유효하지 않은 인증 토큰입니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 댓글 ID 파라미터 추출 및 검증
     const commentId = Number.parseInt(req.params.commentId ?? '', 10);
@@ -727,45 +591,7 @@ export async function deleteCommentHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'MISSING_TOKEN',
-          message: '인증 토큰이 필요합니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: '유효하지 않은 인증 토큰입니다.',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 댓글 ID 파라미터 추출 및 검증
     const commentId = Number.parseInt(req.params.commentId ?? '', 10);
