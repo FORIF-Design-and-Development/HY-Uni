@@ -6,8 +6,8 @@ import RegisterTest from "./pages/auth/RegisterTest";
 import ResetPasswordTest from "./pages/auth/ResetPasswordTest.tsx";
 import { CafeteriaPage } from "./pages/campus/CafeteriaPage.tsx"; // ✅ 추가
 import NoticePage from "./pages/campus/NoticePage.tsx";
-import ReviewPage from "./pages/timetable/ReviewPage";
-import Timetable from "./pages/timetable/TimetablePage.tsx";
+import ReviewPage from "./pages/campus/ReviewPage";
+import Timetable from "./pages/campus/TimetablePage.tsx";
 
 export default function App() {
   return (
