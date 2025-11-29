@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../../config/jwt';
 import { findBoardById } from '../../models/community/board.model';
 import type {
   AttachmentItem,
@@ -143,45 +142,7 @@ export async function createPost(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시판 ID 파라미터 추출 및 검증
     const boardId = Number.parseInt(req.params.boardId ?? '', 10);
@@ -353,45 +314,7 @@ export async function updatePost(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시글 ID 파라미터 추출 및 검증
     const postId = Number.parseInt(req.params.postId ?? '', 10);
@@ -639,7 +562,6 @@ export async function updatePost(
 }
 
 // 게시글 상세 조회
-// TODO: 댓글 기능 구현 후 다시 검토
 // - 게시글 ID를 받아서 게시글 상세 정보를 반환하는 HTTP 핸들러
 export async function getPostDetail(
   req: Request,
@@ -647,25 +569,7 @@ export async function getPostDetail(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출 (optional)
-    let currentUserId: number | null = null;
-    const authHeader = req.headers.authorization;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Bearer 토큰 추출
-      const token = authHeader.substring(7); // 'Bearer ' 제거
-
-      // 토큰 검증 및 user_id 추출
-      // TODO: middleware로 refactoring
-      try {
-        const payload = verifyAccessToken(token);
-        currentUserId = payload.userId;
-      } catch (error) {
-        // 토큰이 유효하지 않으면 currentUserId는 null로 유지 (비인증 사용자로 처리)
-        // 에러를 반환하지 않고 게시글 조회는 계속 진행
-      }
-    }
+    const currentUserId = (req as any).userId;
 
     // 게시글 ID 파라미터 추출 및 검증
     const postId = Number.parseInt(req.params.postId ?? '', 10);
@@ -720,45 +624,7 @@ export async function deletePost(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시글 ID 파라미터 추출 및 검증
     const postId = Number.parseInt(req.params.postId ?? '', 10);
@@ -852,45 +718,7 @@ export async function togglePostReactionHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시글 ID 파라미터 추출 및 검증
     const postId = Number.parseInt(req.params.postId ?? '', 10);
@@ -1032,45 +860,7 @@ export async function togglePostScrapHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시글 ID 파라미터 추출 및 검증
     const postId = Number.parseInt(req.params.postId ?? '', 10);
@@ -1150,45 +940,7 @@ export async function votePostPollHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시글 ID 파라미터 추출 및 검증
     const postId = Number.parseInt(req.params.postId ?? '', 10);
@@ -1372,45 +1124,7 @@ export async function getBoardPostsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: JWT 토큰 추출 로직을 미들웨어로 리팩토링 예정
-    // Authorization 헤더에서 JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '인증 토큰이 필요합니다.',
-          code: 'MISSING_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    // TODO: middleware로 refactoring
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
+    const userId = (req as any).userId;
 
     // 게시판 ID 파라미터 추출 및 검증
     const boardId = Number.parseInt(req.params.boardId ?? '', 10);
