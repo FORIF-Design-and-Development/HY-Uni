@@ -69,7 +69,7 @@ export default function TimetableHeader() {
           const name = set?.timetable_name || "선택된 시간표";
 
           if (!window.confirm(`[${name}]을(를) 삭제하시겠습니까?`)) return;
-          deleteSet(selectedSet);
+          deleteSet();
         }}
         style={{
           padding: "6px 10px",
