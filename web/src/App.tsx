@@ -1,3 +1,33 @@
+import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
+import ChatbotPage from "./pages/campus/ChatbotPage.tsx";
+import DashboardPage from "./pages/DashboardPage";
+import FindEmailTest from "./pages/auth/FindEmailTest.tsx";
+import LoginTest from "./pages/auth/LoginTest";
+import RegisterTest from "./pages/auth/RegisterTest";
+import ResetPasswordTest from "./pages/auth/ResetPasswordTest.tsx";
+import { CafeteriaPage } from "./pages/campus/CafeteriaPage.tsx";
+import NoticePage from "./pages/campus/NoticePage.tsx";
+import ReviewPage from "./pages/campus/ReviewPage";
+import Timetable from "./pages/campus/TimetablePage.tsx";
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <nav>
+        <Link to="/">dashboard</Link>
+      </nav>
+      <Routes>
+        <Route path="/register" element={<RegisterTest/>}/>
+        <Route path="/login" element={<LoginTest />}/>
+        <Route path="/test/find-email" element={<FindEmailTest />} />
+        <Route path="/test/reset-password" element={<ResetPasswordTest />} />
+        <Route path="/chatbot" element={<ChatbotPage />} />
+        <Route path="/timetable" element={<Timetable />} />
+        <Route index element={<DashboardPage />} />
+        <Route path="/" element={<Navigate to="/campus/notice" replace />} />
+        <Route path="/campus/notices" element={<NoticePage />} />
+        <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
+        <Route path="/reviews/:courseId" element={<ReviewPage />} />
 import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
