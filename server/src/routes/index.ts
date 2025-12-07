@@ -2,6 +2,7 @@ import type { Express } from 'express';
 
 import authRoutes from './auth/auth.routes';
 import departmentRoutes from './auth/department.routes';
+import chatbotRoutes from './campus/chatbot.routes';
 import cafeteriaRoutes from './campus/cafeteria.routes';
 import menuRoutes from './campus/menu.routes';
 import { noticeRoutes } from './campus/notice.routes';
@@ -20,6 +21,7 @@ export function registerRoutes(app: Express) {
   app.get("/", (_req, res) => { res.json({ ok: true }); });
 
   //피쳐별 라우트 등록
+  app.use('/api/chat', chatbotRoutes);
   app.use('/api/community', communityRoutes);
   app.use('/api/cafeterias', cafeteriaRoutes);
   app.use('/api/menus', menuRoutes);
