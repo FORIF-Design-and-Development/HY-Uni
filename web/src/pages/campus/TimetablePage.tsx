@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import TimetableHeader from "../../components/timetable/TimetableHeader";
 import TimetableGrid from "../../components/timetable/TimetableGrid";
 import CourseSearchPanel from "../../components/timetable/CourseSearchPanel";
