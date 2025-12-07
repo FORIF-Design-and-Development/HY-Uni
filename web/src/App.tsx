@@ -1,36 +1,19 @@
-import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
-import ChatbotPage from "./pages/campus/ChatbotPage.tsx";
-import DashboardPage from "./pages/DashboardPage";
-import FindEmailTest from "./pages/auth/FindEmailTest.tsx";
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import React, { useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+
+import FindEmailTest from "./pages/auth/FindEmailTest";
 import LoginTest from "./pages/auth/LoginTest";
 import RegisterTest from "./pages/auth/RegisterTest";
-import ResetPasswordTest from "./pages/auth/ResetPasswordTest.tsx";
-import { CafeteriaPage } from "./pages/campus/CafeteriaPage.tsx";
-import NoticePage from "./pages/campus/NoticePage.tsx";
-import ReviewPage from "./pages/campus/ReviewPage";
-import Timetable from "./pages/campus/TimetablePage.tsx";
+import ResetPasswordTest from "./pages/auth/ResetPasswordTest";
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <nav>
-        <Link to="/">dashboard</Link>
-      </nav>
-      <Routes>
-        <Route path="/register" element={<RegisterTest/>}/>
-        <Route path="/login" element={<LoginTest />}/>
-        <Route path="/test/find-email" element={<FindEmailTest />} />
-        <Route path="/test/reset-password" element={<ResetPasswordTest />} />
-        <Route path="/chatbot" element={<ChatbotPage />} />
-        <Route path="/timetable" element={<Timetable />} />
-        <Route index element={<DashboardPage />} />
-        <Route path="/" element={<Navigate to="/campus/notice" replace />} />
-        <Route path="/campus/notices" element={<NoticePage />} />
-        <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
-        <Route path="/reviews/:courseId" element={<ReviewPage />} />
-import React, { useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import DashboardPage from "./pages/DashboardPage";
+import ChatbotPage from "./pages/campus/ChatbotPage";
+import CafeteriaPage from "./pages/campus/CafeteriaPage";
+import NoticePage from "./pages/campus/NoticePage";
+import ReviewPage from "./pages/campus/ReviewPage";
+import Timetable from "./pages/campus/TimetablePage";
+
 import CommunityHomePage from './pages/community/CommunityHomePage';
 import SettingsPage from './pages/community/SettingsPage';
 import NotificationsPage from './pages/community/NotificationsPage';
@@ -45,6 +28,7 @@ import InternationalBoardPage from './pages/community/InternationalBoardPage';
 import CreatePostPage from './pages/community/CreatePostPage';
 import PostDetailPage from './pages/community/PostDetailPage';
 import PollCreationPage from './pages/community/PollCreationPage';
+
 
 // --- Components ---
 
@@ -78,95 +62,57 @@ const AnimatedRoutes = () => {
 
   return (
     <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<Navigate to="/community" replace />} />
-        
-        <Route path="/community" element={
-          <PageTransition><CommunityHomePage /></PageTransition>
-        } />
-        
-        {/* Notifications Page Route */}
-        <Route path="/community/notifications" element={
-          <PageTransition><NotificationsPage /></PageTransition>
-        } />
-        
-        <Route path="/community/create" element={
-          <PageTransition><CreatePostPage /></PageTransition>
-        } />
-        <Route path="/community/create/poll" element={
-          <PageTransition><PollCreationPage /></PageTransition>
-        } />
-        
-        {/* Board List Page Route */}
-        <Route path="/community/board-list" element={
-          <PageTransition><BoardListPage /></PageTransition>
-        } />
-        
-        {/* Search Page Route */}
-        <Route path="/community/search" element={
-          <PageTransition><SearchPage /></PageTransition>
-        } />
+      <PageTransition>
+        <Routes location={location} key={location.pathname}>
 
-        {/* My Board Page Route */}
-        <Route path="/community/board/my" element={
-          <PageTransition><MyBoardPage /></PageTransition>
-        } />
+          <Route path="/register" element={<RegisterTest />} />
+          <Route path="/login" element={<LoginTest />} />
+          <Route path="/test/find-email" element={<FindEmailTest />} />
+          <Route path="/test/reset-password" element={<ResetPasswordTest />} />
+          <Route path="/chatbot" element={<ChatbotPage />} />
+          <Route path="/timetable" element={<Timetable />} />
+          <Route path="/campus/notices" element={<NoticePage />} />
+          <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
+          <Route path="/reviews/:courseId" element={<ReviewPage />} />
 
-        {/* International Board Page Route */}
-        <Route path="/community/board/international" element={
-          <PageTransition><InternationalBoardPage /></PageTransition>
-        } />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/" element={<Navigate to="/campus/notices" replace />} />
 
-        {/* Generic Board Detail Page Route (recommended, hot, free, etc.) */}
-        <Route path="/community/board/:type" element={
-          <PageTransition><BoardDetailPage /></PageTransition>
-        } />
-        
-        {/* Settings Page Route */}
-        <Route path="/community/settings" element={
-          <PageTransition><SettingsPage /></PageTransition>
-        } />
-        
-        {/* Keyword Settings Page Route */}
-        <Route path="/community/keywords" element={
-          <PageTransition><KeywordSettingsPage /></PageTransition>
-        } />
-        
-        {/* Filtering Keyword Settings Page Route */}
-        <Route path="/community/filtering-keywords" element={
-          <PageTransition><FilteringKeywordSettingsPage /></PageTransition>
-        } />
-        
-        {/* Hashtag Settings Page Route */}
-        <Route path="/community/hashtags" element={
-          <PageTransition><HashtagSettingsPage /></PageTransition>
-        } />
-        
-        {/* Post Detail Page Route */}
-        <Route path="/community/post/:id" element={
-          <PageTransition><PostDetailPage /></PageTransition>
-        } />
-        
-        {/* Edit Post Page Route - reuses CreatePostPage */}
-        <Route path="/community/post/:id/edit" element={
-          <PageTransition><CreatePostPage /></PageTransition>
-        } />
-        
-        <Route path="*" element={<Navigate to="/community" replace />} />
-      </Routes>
+          <Route path="/community" element={<CommunityHomePage />} />
+          <Route path="/community/notifications" element={<NotificationsPage />} />
+          <Route path="/community/create" element={<CreatePostPage />} />
+          <Route path="/community/create/poll" element={<PollCreationPage />} />
+          <Route path="/community/board-list" element={<BoardListPage />} />
+          <Route path="/community/search" element={<SearchPage />} />
+          <Route path="/community/board/my" element={<MyBoardPage />} />
+          <Route path="/community/board/international" element={<InternationalBoardPage />} />
+          <Route path="/community/board/:type" element={<BoardDetailPage />} />
+          <Route path="/community/settings" element={<SettingsPage />} />
+          <Route path="/community/keywords" element={<KeywordSettingsPage />} />
+          <Route path="/community/filtering-keywords" element={<FilteringKeywordSettingsPage />} />
+          <Route path="/community/hashtags" element={<HashtagSettingsPage />} />
+          <Route path="/community/post/:id" element={<PostDetailPage />} />
+          <Route path="/community/post/:id/edit" element={<CreatePostPage />} />
+
+          <Route path="*" element={<Navigate to="/campus/notices" replace />} />
+
+        </Routes>
+      </PageTransition>
     </AnimatePresence>
   );
 };
 
-const App: React.FC = () => {
+
+export default function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
+      <ScrollToTop />
       <div className="max-w-md mx-auto min-h-screen bg-white border-x border-gray-100 shadow-2xl overflow-hidden relative">
-        <ScrollToTop />
+        <nav>
+          <Link to="/">dashboard</Link>
+        </nav>
         <AnimatedRoutes />
       </div>
-    </HashRouter>
+    </BrowserRouter>
   );
-};
-
-export default App;
+}
