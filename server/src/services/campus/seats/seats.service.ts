@@ -47,7 +47,7 @@ class SeatsService {
             const simplifiedSeatsData: SeatRoom[] = [];
 
             for (const roomId of this.ROOM_IDS) {
-                console.log(`[SeatsService] roomId ${roomId} 요청 중...`);
+                // console.log(`[SeatsService] roomId ${roomId} 요청 중...`);
                 const data = await this.getLibrarySeatsById(roomId);
 
                 if (data && data.success && data.data.list.length > 0) {

@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { findBoardById } from '../../models/community/board.model';
 import type {
   AttachmentItem,
@@ -6,15 +6,16 @@ import type {
 } from '../../models/community/post.model';
 import {
   createPostWithRelations,
-  findPostDetailById,
-  updatePostWithRelations,
   deletePostWithRelations,
+  findPostDetailById,
+  findPostsByBoardId,
   togglePostReaction,
   togglePostScrap,
+  updatePostWithRelations,
   votePostPoll,
-  findPostsByBoardId,
   type BoardPostSortBy,
 } from '../../models/community/post.model';
+import { checkAndUpdateMission, logMissionAction } from '../../services/campus/hylion/hylion.service';
 
 // 게시물 생성 요청 본문(바디) 데이터 필드 정의
 interface CreatePostBody {
@@ -290,6 +291,11 @@ export async function createPost(
     });
 
     const location = `/posts/${result.postId}`;
+
+    // 🆕 미션 로깅 (비동기, 에러 발생해도 게시글 작성은 성공)
+    logMissionAction(userId, 'COMMUNITY_POST', 'post_create', result.postId)
+      .then(() => checkAndUpdateMission(userId, 'community_post'))
+      .catch(err => console.error('[Post] 미션 처리 실패:', err));
 
     // 게시물 생성 성공 시 201 응답
     res.status(201).location(location).json({

@@ -3,16 +3,17 @@ import type { Express } from 'express';
 import authRoutes from './auth/auth.routes';
 import departmentRoutes from './auth/department.routes';
 import cafeteriaRoutes from './campus/cafeteria.routes';
+import calendarRoutes from './campus/calendar.routes';
+import coursesRoutes from './campus/courses.routes';
+import hylionRoutes from './campus/hylion.routes';
 import menuRoutes from './campus/menu.routes';
 import { noticeRoutes } from './campus/notice.routes';
 import { placeRoutes } from './campus/place.routes';
 import seatsRoutes from './campus/seats.routes';
-import communityRoutes from './community/community.routes';
-import coursesRoutes from './campus/courses.routes';
+import reviewRouter from './campus/timetable.review.routers';
 import timetableRoutes from './campus/timetable.routes';
 import timetablesetsRoutes from './campus/timetablesets.routes';
-import calendarRoutes from './campus/calendar.routes';
-import reviewRouter from './campus/timetable.review.routers'; 
+import communityRoutes from './community/community.routes';
 
 
 export function registerRoutes(app: Express) {
@@ -33,4 +34,5 @@ export function registerRoutes(app: Express) {
   app.use('/api/timetablesets', timetablesetsRoutes);
   app.use('/api/calendar', calendarRoutes);
   app.use("/api/reviews", reviewRouter);
+  app.use('/api/hylion', hylionRoutes);
 }
