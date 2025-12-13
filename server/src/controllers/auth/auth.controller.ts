@@ -1,11 +1,19 @@
-import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
+import { NextFunction, Request, Response } from 'express';
 import nodemailer from 'nodemailer';
-import { createUser, findUserByEmail, findUserByStudentNumber, findUserByNickname, findUserById, updateLastLoginAt,
-  findUserByNameAndBirth, findUserForPasswordReset, updateUserPassword
- } from '../../models/auth/auth.model';
-import { findDepartmentById } from '../../models/auth/auth.department.model';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../config/jwt';
+import { findDepartmentById } from '../../models/auth/auth.department.model';
+import {
+  createUser, findUserByEmail,
+  findUserById,
+  findUserByNameAndBirth,
+  findUserByNickname,
+  findUserByStudentNumber,
+  findUserForPasswordReset,
+  updateLastLoginAt,
+  updateUserPassword
+} from '../../models/auth/auth.model';
+import { initializeUserHylion } from '../../services/campus/hylion/hylion.service';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -92,6 +100,13 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       grade,
       status
     });
+
+    try {
+      await initializeUserHylion(user.user_id);
+    } catch (hylionError) {
+      console.error('[Auth] 하이리온 초기화 실패:', hylionError);
+      // 에러 발생해도 회원가입은 성공으로 처리
+    }
 
     //5. 응답(민감 정보 제거)
     const { password: _, ...safeUser } = user;

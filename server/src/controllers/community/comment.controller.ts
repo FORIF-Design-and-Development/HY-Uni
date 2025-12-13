@@ -1,13 +1,14 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import {
   checkPostExists,
   createComment,
   createReply,
+  deleteComment,
   toggleCommentReaction,
   updateComment,
-  deleteComment,
 } from '../../models/community/comment.model';
-import { notifyPostAuthor, notifyCommentAuthor } from '../../services/community/notification.service';
+import { checkAndUpdateMission, logMissionAction } from '../../services/campus/hylion/hylion.service';
+import { notifyCommentAuthor, notifyPostAuthor } from '../../services/community/notification.service';
 
 // 댓글 생성 요청 본문(바디) 데이터 필드 정의
 interface CreateCommentBody {
@@ -163,6 +164,11 @@ export async function createCommentHandler(
       console.error('Failed to send notification:', error);
       // 알림 실패는 메인 로직에 영향 없도록 에러를 던지지 않음
     }
+
+    // 미션 로깅
+    logMissionAction(userId, 'COMMUNITY_COMMENT', 'comment_create', result.commentId)
+      .then(() => checkAndUpdateMission(userId, 'community_comment'))
+      .catch(err => console.error('[Comment] 미션 처리 실패:', err));
 
     // 댓글 생성 성공 시 201 응답
     res.status(201).json({
@@ -401,6 +407,11 @@ export async function createReplyHandler(
         // 알림 실패는 메인 로직에 영향 없도록 에러를 던지지 않음
       }
 
+      // 🆕 미션 로깅 (비동기, 에러 발생해도 대댓글 작성은 성공)
+      logMissionAction(userId, 'COMMUNITY_COMMENT', 'comment_create', result.commentId)
+        .then(() => checkAndUpdateMission(userId, 'community_comment'))
+        .catch(err => console.error('[Comment] 미션 처리 실패:', err));
+        
       // 대댓글 생성 성공 시 201 응답
       res.status(201).json({
         data: {
