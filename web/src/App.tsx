@@ -1,6 +1,6 @@
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import React, { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import FindEmailTest from "./pages/auth/FindEmailTest";
 import LoginTest from "./pages/auth/LoginTest";
@@ -8,26 +8,27 @@ import RegisterTest from "./pages/auth/RegisterTest";
 import ResetPasswordTest from "./pages/auth/ResetPasswordTest";
 
 import DashboardPage from "./pages/DashboardPage";
-import ChatbotPage from "./pages/campus/ChatbotPage";
 import CafeteriaPage from "./pages/campus/CafeteriaPage";
+import ChatbotPage from "./pages/campus/ChatbotPage";
+import HylionPage from './pages/campus/HylionPage';
 import NoticePage from "./pages/campus/NoticePage";
 import ReviewPage from "./pages/campus/ReviewPage";
 import Timetable from "./pages/campus/TimetablePage";
 
+import BoardDetailPage from './pages/community/BoardDetailPage';
+import BoardListPage from './pages/community/BoardListPage';
 import CommunityHomePage from './pages/community/CommunityHomePage';
-import SettingsPage from './pages/community/SettingsPage';
-import NotificationsPage from './pages/community/NotificationsPage';
-import KeywordSettingsPage from './pages/community/KeywordSettingsPage';
+import CreatePostPage from './pages/community/CreatePostPage';
 import FilteringKeywordSettingsPage from './pages/community/FilteringKeywordSettingsPage';
 import HashtagSettingsPage from './pages/community/HashtagSettingsPage';
-import BoardListPage from './pages/community/BoardListPage';
-import SearchPage from './pages/community/SearchPage';
-import MyBoardPage from './pages/community/MyBoardPage';
-import BoardDetailPage from './pages/community/BoardDetailPage';
 import InternationalBoardPage from './pages/community/InternationalBoardPage';
-import CreatePostPage from './pages/community/CreatePostPage';
-import PostDetailPage from './pages/community/PostDetailPage';
+import KeywordSettingsPage from './pages/community/KeywordSettingsPage';
+import MyBoardPage from './pages/community/MyBoardPage';
+import NotificationsPage from './pages/community/NotificationsPage';
 import PollCreationPage from './pages/community/PollCreationPage';
+import PostDetailPage from './pages/community/PostDetailPage';
+import SearchPage from './pages/community/SearchPage';
+import SettingsPage from './pages/community/SettingsPage';
 
 
 // --- Components ---
@@ -74,6 +75,7 @@ const AnimatedRoutes = () => {
           <Route path="/campus/notices" element={<NoticePage />} />
           <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
           <Route path="/reviews/:courseId" element={<ReviewPage />} />
+          <Route path="/hylion" element={<HylionPage />} />
 
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/" element={<Navigate to="/campus/notices" replace />} />

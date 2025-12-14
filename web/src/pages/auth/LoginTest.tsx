@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { login, LoginPayload, AuthResponse } from "../../api/auth/auth.api";
-import { useAuthStore } from "../../store/auth.store";
 import { useNavigate } from "react-router-dom";
+import { AuthResponse, login, LoginPayload } from "../../api/auth/auth.api";
+import { useAuthStore } from "../../store/auth.store";
 
 export default function LoginTest() {
   const navigate = useNavigate();
@@ -35,6 +35,8 @@ export default function LoginTest() {
     try {
       const res = await login(form);
 
+      localStorage.setItem('accessToken', res.accessToken); // 임시 추가
+
       setAuth({
         user: res.user,
         department: res.department ?? null,
@@ -42,8 +44,13 @@ export default function LoginTest() {
       });
 
       setResult(res);
+
+        // ✅ 로그인 성공 시 dashboard로 이동
+      navigate('/dashboard');
     } catch (err: any) {
       clearAuth();
+
+      localStorage.removeItem('accessToken'); // 임시 추가
 
       if (err.response) {
         setError(`Error ${err.response.status}: ${err.response.data.message}`);
