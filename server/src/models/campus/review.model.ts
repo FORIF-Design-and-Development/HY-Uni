@@ -77,7 +77,7 @@ const mapRowToReview = (row: ReviewRow): Review => ({
  */
 export const findByPlaceId = async (placeId: number): Promise<Review[]> => {
   const query = `
-    SELECT * FROM review 
+    SELECT * FROM place_review 
     WHERE place_id = ? 
     ORDER BY created_at DESC
   `;
@@ -89,7 +89,7 @@ export const findByPlaceId = async (placeId: number): Promise<Review[]> => {
  * ID로 특정 리뷰 1개 조회
  */
 export const findById = async (reviewId: number): Promise<Review | null> => {
-  const query = "SELECT * FROM review WHERE review_id = ?";
+  const query = "SELECT * FROM place_review WHERE review_id = ?";
   const [rows] = await db.query<ReviewRow[]>(query, [reviewId]);
 
   const firstRow = rows[0];
@@ -109,10 +109,10 @@ export const create = async (
   reviewData: CreateReviewDTO
 ): Promise<number> => {
   const { rating, comment, imageUrl } = reviewData;
-  
+
   // DTO에 userId가 있더라도, 함수의 인자로 받은 userId를 사용하는 것이 더 명확합니다.
   const query = `
-    INSERT INTO review (place_id, user_id, rating, comment, image_url)
+    INSERT INTO place_review (place_id, user_id, rating, comment, image_url)
     VALUES (?, ?, ?, ?, ?)
   `;
   const [result] = await db.execute<ResultSetHeader>(query, [
@@ -134,13 +134,10 @@ export const update = async (
 ): Promise<boolean> => {
   const { rating, comment, imageUrl } = reviewData;
   const query = `
-    UPDATE review
+    UPDATE place_review
     SET rating = ?, comment = ?, image_url = ?
     WHERE review_id = ?
   `;
-
-  // ⭐️ (인증 가정) 실제로는 WHERE review_id = ? AND user_id = ? 로
-  //    본인만 수정할 수 있게 해야 합니다.
 
   const [result] = await db.execute<ResultSetHeader>(query, [
     rating,
@@ -156,7 +153,7 @@ export const update = async (
  * ID로 특정 리뷰 삭제
  */
 export const remove = async (reviewId: number): Promise<boolean> => {
-  const query = "DELETE FROM review WHERE review_id = ?";
+  const query = "DELETE FROM place_review WHERE review_id = ?";
 
   // ⭐️ (인증 가정) 실제로는 WHERE review_id = ? AND user_id = ? 로
   //    본인만 삭제할 수 있게 해야 합니다.
