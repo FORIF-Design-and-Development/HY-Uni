@@ -101,8 +101,10 @@
 // }
 
 
+
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { HylionWidget } from "../components/campus/HylionWidget";
 import { LibrarySeatsWidget } from '../components/campus/LibrarySeatsWidget';
 import NoticeCard from "../components/campus/NoticeCard";
 import { useNoticeStore } from "../store/useNoticeStore";
@@ -118,19 +120,8 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
-      {/* 1. 환영 섹션 */}
-      <section className="bg-indigo-600 rounded-2xl p-8 text-white mb-10 shadow-lg">
-        <h1 className="text-3xl font-bold mb-2">반갑습니다, 학우님! 👋</h1>
-        <p className="opacity-90 mb-6">오늘도 즐거운 캠퍼스 생활 되세요.</p>
-        <div className="flex gap-3">
-          <Link
-            to="/campus/notices"
-            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold hover:bg-indigo-50 transition"
-          >
-            공지사항 전체보기
-          </Link>
-        </div>
-      </section>
+      {/* 1. 하이리온 위젯 */}
+      <HylionWidget />
 
       {/* 2. 퀵 메뉴 */}
       <section className="mb-10">
@@ -141,25 +132,25 @@ export default function DashboardPage() {
               name: "학사 일정",
               icon: "📅",
               bg: "bg-orange-100 text-orange-600",
-              link: "/calendar", // 나중에 추가
+              link: "/calendar",
             },
             {
               name: "도서관 좌석",
               icon: "📚",
               bg: "bg-blue-100 text-blue-600",
-              link: "/library", // 나중에 추가
+              link: "/library",
             },
             {
               name: "학식 메뉴",
               icon: "🍽️",
               bg: "bg-green-100 text-green-600",
-              link: "/campus/cafeteria", // ✅ 학식 페이지 링크
+              link: "/campus/cafeteria",
             },
             {
               name: "셔틀 버스",
               icon: "🚌",
               bg: "bg-purple-100 text-purple-600",
-              link: "/shuttle", // 나중에 추가
+              link: "/shuttle",
             },
           ].map((item) => (
             <Link
