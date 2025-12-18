@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>한양대 건물 좌표 추출기 (Wide & Fixed)</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f0f2f5;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+
+      h1 {
+        margin: 0 0 10px 0;
+        color: #333;
+        font-size: 1.5rem;
+      }
+
+      .layout {
+        display: flex;
+        gap: 20px;
+        width: 98%; /* ⭐️ 화면 가로를 꽉 채우도록 변경 */
+        max-width: none; /* 최대 너비 제한 해제 */
+        height: calc(100% - 60px);
+        overflow: hidden;
+      }
+
+      /* 왼쪽: 지도 및 타겟 영역 */
+      .map-section {
+        flex: 5; /* ⭐️ 지도 영역 비율을 3 -> 5로 늘림 */
+        display: flex;
+        flex-direction: column;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        overflow: hidden;
+      }
+
+      /* 현재 타겟 표시 영역 */
+      .current-target-box {
+        background-color: #e3f2fd;
+        border: 2px solid #2196f3;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .target-info {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #0d47a1;
+      }
+      .target-sub {
+        font-size: 0.9rem;
+        color: #555;
+        margin-left: 10px;
+      }
+
+      .controls-row {
+        display: flex;
+        gap: 10px;
+      }
+
+      .map-wrapper {
+        position: relative;
+        flex: 1;
+        border: 2px dashed #ddd;
+        overflow: auto; /* 스크롤 가능 */
+        background-color: #fafafa;
+        cursor: crosshair;
+        display: flex;
+        align-items: flex-start; /* 이미지가 커지면 왼쪽 위부터 시작 */
+        justify-content: center;
+      }
+
+      /* ⭐️ 이미지와 핀을 묶어주는 내부 컨테이너 (좌표 기준점) */
+      #mapContent {
+        position: relative;
+        display: inline-block; /* 내용물(이미지) 크기에 딱 맞게 */
+      }
+
+      .map-wrapper img {
+        max-width: none; /* 부모 크기에 갇히지 않고 원본 크기 유지 가능 */
+        display: block;
+      }
+
+      /* 오른쪽: 로그 영역 */
+      .sidebar {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        min-width: 350px;
+        max-width: 450px; /* 사이드바가 너무 커지지 않게 제한 */
+      }
+
+      .log-list-wrapper {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        background: #fafafa;
+      }
+
+      .log-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .log-item {
+        padding: 8px 10px;
+        border-bottom: 1px solid #ddd;
+        font-size: 0.9em;
+        display: flex;
+        justify-content: space-between;
+        background: white;
+      }
+      .log-item:hover {
+        background-color: #f0f8ff;
+      }
+      .log-code {
+        font-weight: bold;
+        color: #d35400;
+        width: 50px;
+      }
+      .log-name {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .log-coords {
+        font-family: monospace;
+        color: #2980b9;
+      }
+
+      textarea {
+        width: 100%;
+        height: 150px;
+        resize: vertical;
+        font-family: monospace;
+        font-size: 0.85em;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        white-space: pre;
+      }
+
+      .btn {
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      .btn:hover {
+        background: #2980b9;
+      }
+      .btn.skip {
+        background: #95a5a6;
+      }
+      .btn.skip:hover {
+        background: #7f8c8d;
+      }
+      .btn.reset {
+        background: #e74c3c;
+      }
+      .btn.copy {
+        background: #27ae60;
+        width: 100%;
+        margin-top: 5px;
+      }
+
+      /* 핀 */
+      .pin {
+        position: absolute;
+        width: 0;
+        height: 0;
+        pointer-events: none;
+        z-index: 10;
+      }
+      .pin::after {
+        content: "📍";
+        position: absolute;
+        font-size: 20px;
+        transform: translate(-50%, -100%);
+        text-shadow: 0 2px 2px rgba(0, 0, 0, 0.3);
+      }
+      .pin-label {
+        position: absolute;
+        top: -35px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 11px;
+        white-space: nowrap;
+        z-index: 11;
+      }
+
+      #tooltip {
+        position: fixed;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        pointer-events: none;
+        display: none;
+        font-size: 0.8rem;
+        z-index: 1000;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🏫 한양대 건물 좌표 추출기 (Wide)</h1>
+
+    <div class="layout">
+      <div class="map-section">
+        <!-- 1. 타겟 안내 바 -->
+        <div class="current-target-box">
+          <div id="targetDisplay">
+            <span class="target-info" id="currentTargetText"
+              >이미지를 먼저 업로드하세요</span
+            >
+            <span class="target-sub" id="progressText"></span>
+          </div>
+          <div class="controls-row">
+            <button class="btn skip" id="skipBtn" disabled>
+              건너뛰기 (Skip)
+            </button>
+            <button class="btn" id="prevBtn" disabled>◀ 이전</button>
+          </div>
+        </div>
+
+        <!-- 2. 지도 영역 -->
+        <div class="map-wrapper" id="mapWrapper">
+          <!-- ⭐️ 핀이 이미지 위에 고정되도록 감싸는 컨테이너 추가 -->
+          <div id="mapContent">
+            <div
+              style="
+                margin-top: 50px;
+                color: #aaa;
+                width: 100%;
+                text-align: center;
+              "
+            >
+              <input type="file" id="imageInput" accept="image/*" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <h3>3. 완료된 목록</h3>
+        <div class="log-list-wrapper">
+          <ul class="log-list" id="logList"></ul>
+        </div>
+
+        <h3>4. SQL 내보내기</h3>
+        <textarea id="bulkTextarea" readonly></textarea>
+        <button class="btn copy" id="copyBtn">SQL 복사</button>
+        <button
+          class="btn reset"
+          id="resetBtn"
+          style="margin-top: 10px; width: 100%"
+        >
+          처음부터 다시하기
+        </button>
+      </div>
+    </div>
+
+    <div id="tooltip"></div>
+
+    <script>
+      // ⭐️ 건물 리스트 (기존 유지)
+      const BUILDINGS = [
+        { code: "101", name: "역사관(구본관)" },
+        { code: "102", name: "본관" },
+        { code: "104", name: "애지문" },
+        { code: "105", name: "한양플라자" },
+        { code: "106", name: "우체국" },
+        { code: "107", name: "학생회관" },
+        { code: "108", name: "국제관" },
+        { code: "109", name: "박물관" },
+
+        { code: "201", name: "재성토목관" },
+        { code: "202", name: "건축관" },
+        { code: "203", name: "과학기술관" },
+        { code: "204", name: "신소재공학관" },
+        { code: "206", name: "공업센터 본관" },
+        { code: "207", name: "공업센터 별관" },
+        { code: "208", name: "퓨전테크센터(FTC)" },
+        { code: "209", name: "노천극장" },
+        { code: "210", name: "미래자동차연구센터" },
+        { code: "211", name: "제2공학관" },
+        { code: "212", name: "제1공학관" },
+
+        { code: "301", name: "대운동장" },
+        { code: "304", name: "산학기술관" },
+        { code: "305", name: "IT/BT관" },
+        { code: "306", name: "올림픽체육관" },
+
+        { code: "401", name: "생활과학대학" },
+        { code: "402", name: "제1음악관" },
+        { code: "403", name: "제2음악관" },
+        { code: "405", name: "백남음악관" },
+        { code: "406", name: "학군단" },
+        { code: "407", name: "제1법학관" },
+        { code: "408", name: "제2법학관" },
+        { code: "409", name: "제3법학관" },
+        { code: "410", name: "경제금융대학" },
+
+        { code: "501", name: "백남학술정보관" },
+        { code: "503", name: "사자가 군것질 할 때" },
+        { code: "504", name: "사회과학관" },
+        { code: "505", name: "사범대학 본관" },
+        { code: "506", name: "사범대학 별관" },
+        { code: "507", name: "자연과학대학" },
+        { code: "508", name: "인문관" },
+
+        { code: "604", name: "제1의학관" },
+        { code: "605", name: "제2의학관" },
+        { code: "606", name: "의과대학 본관" },
+        { code: "607", name: "동문회관" },
+        { code: "609", name: "병원서관" },
+        { code: "610", name: "병원본관" },
+        { code: "611", name: "권역응급의료센터" },
+        { code: "614", name: "병원동관" },
+        { code: "617", name: "미래교육관" },
+        { code: "618", name: "의대계단강의동" },
+
+        { code: "701", name: "HIT" },
+        { code: "702", name: "한양사이버대학교 1관" },
+        { code: "703", name: "한양사이버대학교 2관" },
+        { code: "705", name: "융합교육관" },
+        { code: "706", name: "경영관" },
+        { code: "707", name: "행원파크" },
+
+        { code: "801", name: "제1학생생활관" },
+        { code: "802", name: "제3학생생활관" },
+        { code: "803", name: "제5학생생활관" },
+        { code: "804", name: "제2학생생활관" },
+        { code: "805", name: "개나리관" },
+        { code: "806", name: "한누리관" },
+        { code: "807", name: "게스트하우스" },
+        { code: "809", name: "제6학생생활관" },
+        { code: "810", name: "제7학생생활관" },
+      ];
+
+      // --- State ---
+      let currentIndex = 0;
+      let imgElement = null;
+      let results = [];
+
+      // --- Elements ---
+      const imageInput = document.getElementById("imageInput");
+      const mapWrapper = document.getElementById("mapWrapper");
+      const mapContent = document.getElementById("mapContent"); // ⭐️ 추가된 래퍼
+      const currentTargetText = document.getElementById("currentTargetText");
+      const progressText = document.getElementById("progressText");
+      const skipBtn = document.getElementById("skipBtn");
+      const prevBtn = document.getElementById("prevBtn");
+      const logList = document.getElementById("logList");
+      const bulkTextarea = document.getElementById("bulkTextarea");
+      const tooltip = document.getElementById("tooltip");
+
+      // --- Functions ---
+
+      function updateUI() {
+        if (!imgElement) return;
+
+        if (currentIndex >= BUILDINGS.length) {
+          currentTargetText.textContent = "🎉 모든 건물 좌표 추출 완료!";
+          currentTargetText.style.color = "green";
+          progressText.textContent = "";
+          skipBtn.disabled = true;
+          prevBtn.disabled = false;
+          return;
+        }
+
+        const target = BUILDINGS[currentIndex];
+        currentTargetText.textContent = `📍 [${target.code}] ${target.name}`;
+        currentTargetText.style.color = "#0d47a1";
+        progressText.textContent = `(${currentIndex + 1} / ${
+          BUILDINGS.length
+        })`;
+
+        skipBtn.disabled = false;
+        prevBtn.disabled = currentIndex === 0;
+      }
+
+      function addRecord(x, y) {
+        const target = BUILDINGS[currentIndex];
+
+        const existingIdx = results.findIndex((r) => r.idx === currentIndex);
+        if (existingIdx !== -1) {
+          results.splice(existingIdx, 1);
+        }
+
+        results.push({
+          idx: currentIndex,
+          code: target.code,
+          name: target.name,
+          x: x,
+          y: y,
+        });
+
+        if (x !== null) {
+          drawPin(x, y, target.code);
+        }
+
+        currentIndex++;
+        updateUI();
+        renderResults();
+      }
+
+      function renderResults() {
+        logList.innerHTML = "";
+        const sortedResults = [...results].sort((a, b) => a.idx - b.idx);
+
+        sortedResults.forEach((r) => {
+          const li = document.createElement("li");
+          li.className = "log-item";
+          li.innerHTML = `
+                    <span class="log-code">${r.code}</span>
+                    <span class="log-name">${r.name}</span>
+                    <span class="log-coords">${
+                      r.x !== null ? `(${r.x}, ${r.y})` : "SKIPPED"
+                    }</span>
+                `;
+          logList.appendChild(li);
+        });
+
+        // SQL 생성 시 x, y가 null인(Skip된) 항목은 제외
+        const values = sortedResults
+          .filter((r) => r.x !== null)
+          .map((r) => `('${r.name}', '${r.code}', ${r.x}, ${r.y})`)
+          .join(",\n");
+
+        // building_data.ts용 데이터 포맷으로도 제공하면 편리
+        // 현재는 SQL만 출력
+        const sql = `INSERT INTO campus_buildings (name, building_code, latitude, longitude) VALUES\n${values};`;
+
+        bulkTextarea.value = sortedResults.length > 0 ? sql : "";
+        bulkTextarea.scrollTop = bulkTextarea.scrollHeight;
+      }
+
+      function drawPin(xPercent, yPercent, labelText) {
+        const pin = document.createElement("div");
+        pin.className = "pin";
+        pin.id = `pin-${currentIndex}`;
+        // mapContent가 이미지 크기와 같으므로 %가 정확히 작동함
+        pin.style.left = xPercent + "%";
+        pin.style.top = yPercent + "%";
+
+        const label = document.createElement("div");
+        label.className = "pin-label";
+        label.textContent = labelText;
+
+        pin.appendChild(label);
+        mapContent.appendChild(pin); // ⭐️ mapWrapper가 아닌 mapContent에 붙임
+      }
+
+      // --- Event Listeners ---
+
+      imageInput.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (event) {
+            mapContent.innerHTML = ""; // 초기화
+            imgElement = document.createElement("img");
+            imgElement.src = event.target.result;
+            mapContent.appendChild(imgElement);
+
+            currentIndex = 0;
+            results = [];
+            updateUI();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // 지도 클릭 (좌표 기록)
+      mapWrapper.addEventListener("click", function (e) {
+        if (!imgElement || currentIndex >= BUILDINGS.length) return;
+
+        // 이미지가 아닌 곳 클릭 무시
+        // (e.target이 img, mapContent, pin 등일 수 있음)
+        // 가장 정확한 건 imgElement의 BoundingRect를 기준으로 마우스 좌표 계산
+
+        const rect = imgElement.getBoundingClientRect();
+
+        // 클릭 위치가 이미지 영역 밖이면 무시
+        if (
+          e.clientX < rect.left ||
+          e.clientX > rect.right ||
+          e.clientY < rect.top ||
+          e.clientY > rect.bottom
+        )
+          return;
+
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const xPercent = Number(((x / rect.width) * 100).toFixed(2));
+        const yPercent = Number(((y / rect.height) * 100).toFixed(2));
+
+        addRecord(xPercent, yPercent);
+      });
+
+      skipBtn.addEventListener("click", () => addRecord(null, null));
+
+      prevBtn.addEventListener("click", () => {
+        if (currentIndex > 0) {
+          currentIndex--;
+          const pin = document.getElementById(`pin-${currentIndex}`);
+          if (pin) pin.remove();
+          results = results.filter((r) => r.idx !== currentIndex);
+          updateUI();
+          renderResults();
+        }
+      });
+
+      mapWrapper.addEventListener("mousemove", function (e) {
+        if (!imgElement) return;
+
+        const rect = imgElement.getBoundingClientRect();
+
+        // 이미지 영역 안인지 확인
+        if (
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom
+        ) {
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const xPercent = ((x / rect.width) * 100).toFixed(1);
+          const yPercent = ((y / rect.height) * 100).toFixed(1);
+
+          tooltip.style.display = "block";
+          tooltip.style.left = e.clientX + 15 + "px";
+          tooltip.style.top = e.clientY + 15 + "px";
+          tooltip.textContent = `x:${xPercent}% y:${yPercent}%`;
+        } else {
+          tooltip.style.display = "none";
+        }
+      });
+
+      mapWrapper.addEventListener(
+        "mouseleave",
+        () => (tooltip.style.display = "none")
+      );
+
+      document.getElementById("copyBtn").addEventListener("click", () => {
+        bulkTextarea.select();
+        document.execCommand("copy");
+        alert("복사되었습니다!");
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", () => {
+        if (confirm("초기화 하시겠습니까?")) location.reload();
+      });
+    </script>
+  </body>
+</html>
+
+<!--
+INSERT INTO campus_buildings (name, building_code, latitude, longitude) VALUES
+('역사관(구본관)', '101', 57.11, 71.99),
+('본관', '102', 51.74, 68.09),
+('애지문', '104', 51.2, 78.08),
+('한양플라자', '105', 47.65, 72.38),
+('우체국', '106', 44.46, 69.62),
+('학생회관', '107', 41.73, 60.96),
+('국제관', '108', 60.84, 84.17),
+('박물관', '109', 63.57, 80.37),
+('재성토목관', '201', 64.12, 90.64),
+('건축관', '202', 68.39, 91.21),
+('과학기술관', '203', 70.3, 87.6),
+('신소재공학관', '204', 72.67, 82.65),
+('공업센터 본관', '206', 76.04, 75.04),
+('공업센터 별관', '207', 80.77, 73.71),
+('퓨전테크센터(FTC)', '208', 84.68, 69.33),
+('노천극장', '209', 64.66, 73.9),
+('미래자동차연구센터', '210', 60.02, 66.1),
+('제2공학관', '211', 70.58, 65.81),
+('제1공학관', '212', 57.57, 61.24),
+('대운동장', '301', 82.13, 60.01),
+('산학기술관', '304', 92.51, 49.06),
+('IT/BT관', '305', 91.23, 44.21),
+('올림픽체육관', '306', 90.32, 35.08),
+('생활과학대학', '401', 65.94, 52.97),
+('제1음악관', '402', 71.76, 50.49),
+('제2음악관', '403', 69.12, 50.3),
+('백남음악관', '405', 71.94, 55.25),
+('학군단', '406', 68.48, 60.01),
+('제1법학관', '407', 74.31, 47.54),
+('제2법학관', '408', 76.76, 50.11),
+('제3법학관', '409', 80.5, 46.69),
+('경제금융대학', '410', 79.68, 40.6),
+('백남학술정보관', '501', 53.93, 54.01),
+('사자가 군것질 할 때', '503', 62.21, 59.72),
+('사회과학관', '504', 46.1, 60.2),
+('사범대학 본관', '505', 44.28, 50.3),
+('사범대학 별관', '506', 39.37, 50.97),
+('자연과학대학', '507', 34.45, 49.44),
+('인문관', '508', 32.27, 58.67),
+('제1의학관', '604', 25.08, 66.19),
+('제2의학관', '605', 17.44, 60.77),
+('의과대학 본관', '606', 21.17, 57.44),
+('동문회관', '607', 9.89, 60.01),
+('병원서관', '609', 21.35, 47.83),
+('병원본관', '610', 23.63, 41.36),
+('권역응급의료센터', '611', 26.9, 44.4),
+('병원동관', '614', 30.09, 35.84),
+('미래교육관', '617', 49.74, 39.93),
+('의대계단강의동', '618', 40.73, 33.75),
+('HIT', '701', 59.39, 42.97),
+('한양사이버대학교 1관', '702', 63.57, 45.16),
+('한양사이버대학교 2관', '703', 68.12, 44.59),
+('융합교육관', '705', 61.57, 37.55),
+('경영관', '706', 66.21, 30.8),
+('행원파크', '707', 72.85, 34.22),
+('제1학생생활관', '801', 49.19, 29.94),
+('제3학생생활관', '802', 44.37, 26.23),
+('제5학생생활관', '803', 36.64, 34.89),
+('제2학생생활관', '804', 65.85, 6.91),
+('개나리관', '805', 62.48, 4.25),
+('한누리관', '806', 63.94, 9.58),
+('게스트하우스', '807', 50.29, 3.39),
+('제6학생생활관', '809', 13.43, 4.54),
+('제7학생생활관', '810', 19.62, 9.77);
+
+
+
+-->
