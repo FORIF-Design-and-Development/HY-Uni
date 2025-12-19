@@ -280,7 +280,7 @@ function mergeByCourseAndDay(rows: any[]): any[] {
     if (a.day !== b.day)
       return (DAY_ORDER[a.day] || 99) - (DAY_ORDER[b.day] || 99);
     return Number(a.start_time) - Number(b.start_time);
-  });
+  }); 
 
   const merged: any[] = [];
   let cur: any = null;

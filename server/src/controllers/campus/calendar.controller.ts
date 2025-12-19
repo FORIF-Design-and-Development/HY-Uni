@@ -6,9 +6,7 @@ import { Calendar, CalendarResponse, CreateCalendarRequest, UpdateCalendarReques
 // 일정 조회 (GET /api/calendar/events)
 export async function getCalendarEvents(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: 인증 미들웨어 완성 후 실제 user_id 사용
-    const userId = 2; // 임시로 하드코딩
-    // const userId = (req as any).user?.userId;
+    const userId = (req as any).userId; // requireAuth 미들웨어가 설정
 
     const { start_datetime, end_datetime } = req.query;
 
@@ -49,9 +47,7 @@ export async function getCalendarEvents(req: Request, res: Response, next: NextF
 // 일정 생성 (POST /api/calendar/events)
 export async function createCalendarEvent(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: 인증 미들웨어 완성 후 실제 user_id 사용
-    const userId = 2; // 임시로 하드코딩
-    // const userId = (req as any).user?.userId;
+    const userId = (req as any).userId; // requireAuth 미들웨어가 설정
 
     const {
       event_title,
@@ -124,9 +120,7 @@ export async function createCalendarEvent(req: Request, res: Response, next: Nex
 // 일정 수정 (PATCH /api/calendar/events/:calendarId)
 export async function updateCalendarEvent(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: 인증 미들웨어 완성 후 실제 user_id 사용
-    const userId = 2; // 임시로 하드코딩
-    // const userId = (req as any).user?.userId;
+    const userId = (req as any).userId; // requireAuth 미들웨어가 설정
 
     const calendarId = Number(req.params.calendarId);
     
@@ -235,9 +229,7 @@ export async function updateCalendarEvent(req: Request, res: Response, next: Nex
 // 일정 삭제 (DELETE /api/calendar/events/:calendarId)
 export async function deleteCalendarEvent(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: 인증 미들웨어 완성 후 실제 user_id 사용
-    const userId = 2; // 임시로 하드코딩
-    // const userId = (req as any).user?.userId;
+    const userId = (req as any).userId; // requireAuth 미들웨어가 설정
 
     const calendarId = Number(req.params.calendarId);
     

@@ -306,16 +306,16 @@ function timeToPeriod(time: string | number | null) {
               c.end_time !== "-";
 
 
-            const periodText = hasTime
-              ? `${c.day} ${c.start_time}~${c.end_time}`
-              : "시간 미지정";
+            // const periodText = hasTime
+            //   ? `${c.day} ${c.start_time}~${c.end_time}`
+            //   : "시간 미지정";
 
-            const timeText = hasTime
-              ? periodToTimeRange(
-                  Number(c.start_time),
-                  Number(c.end_time)
-                )
-              : "";
+            // const timeText = hasTime
+            //   ? periodToTimeRange(
+            //       Number(c.start_time),
+            //       Number(c.end_time)
+            //     )
+            //   : "";
 
             return (
               <div

@@ -4,7 +4,7 @@ import { CafeteriaCard } from '../../components/campus/CafeteriaCard';
 import { MealTimeFilter } from '../../components/campus/MealTimeFilter';
 import { useCafeteriaStore } from '../../store/cafeteria.store';
 
-export function CafeteriaPage() {
+export default function CafeteriaPage() {
   const {
     todayMenus,
     selectedMealTime,
