@@ -102,9 +102,14 @@ const CommunityHomePage: React.FC = () => {
   };
 
   // Transform hashtags to KeywordItem format with positions
+  // Select 5 random hashtags regardless of board type
   const transformHashtags = (tags: Array<{ id: number; name: string }>): KeywordItem[] => {
-    const positions = generateKeywordPositions(tags.length);
-    return tags.slice(0, 5).map((tag, index) => ({
+    // Shuffle array and take first 5
+    const shuffled = [...tags].sort(() => Math.random() - 0.5);
+    const selectedTags = shuffled.slice(0, 5);
+    
+    const positions = generateKeywordPositions(selectedTags.length);
+    return selectedTags.map((tag, index) => ({
       id: tag.id,
       text: `#${tag.name}`,
       top: positions[index]?.top || '50%',
