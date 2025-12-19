@@ -45,6 +45,7 @@ export interface BoardPostListItem {
     imageUrl: string | null;
     videoUrl: string | null;
   };
+  hasPoll: boolean; // poll 존재 여부
 }
 
 // 게시판 정보

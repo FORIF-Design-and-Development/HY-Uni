@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Heart, MessageCircle, BarChart2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getBoardPosts, BoardPostListItem } from '../../api/community/post.api';
 
@@ -24,6 +24,7 @@ interface PostItem {
   hashtags: string[];
   hasImage: boolean;
   imageUrl: string | null;
+  hasPoll?: boolean; // 투표 여부
 }
 
 // 상대 시간 포맷팅 함수
@@ -59,6 +60,7 @@ function mapPostItem(post: BoardPostListItem): PostItem {
     hashtags: post.tags.map(tag => `#${tag.name}`),
     hasImage: post.previews.imageUrl !== null,
     imageUrl: post.previews.imageUrl,
+    hasPoll: post.hasPoll, // poll 존재 여부
   };
 }
 
@@ -189,10 +191,18 @@ const MyBoardPage: React.FC = () => {
                     <span className="inline-block bg-blue-200 text-blue-600 text-[10px] px-2 py-0.5 rounded font-medium mb-1.5">
                       {post.badge}
                     </span>
-                    <h3 className="text-base font-bold text-gray-900 mb-1">{post.title}</h3>
+                    <h3 className="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+                      {post.title}
+                      {post.hasPoll && (
+                        <div className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded text-xs text-gray-500 font-medium">
+                          <BarChart2 className="w-3 h-3" />
+                          투표
+                        </div>
+                      )}
+                    </h3>
                     <p className="text-sm text-gray-500 mb-2">{post.content}</p>
                     
-                    <div className="flex items-center flex-nowrap text-xs text-gray-400 gap-2 mb-2">
+                    <div className="flex items-center flex-nowrap text-xs text-gray-400 gap-2 mb-2 overflow-x-auto no-scrollbar">
                       <div className="flex items-center gap-0.5 shrink-0">
                         <Heart className="w-3.5 h-3.5" />
                         <span>{post.likes}</span>
