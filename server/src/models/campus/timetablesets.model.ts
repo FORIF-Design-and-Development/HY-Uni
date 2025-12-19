@@ -29,7 +29,7 @@ export const TimetableSetsModel = {
 
   createSet: async (name: string, userId : number): Promise<void> => {
     await pool.query(
-      "INSERT INTO timetable_list (timetable_name, user_id), VALUES (?,?)",
+      "INSERT INTO timetable_list (timetable_name, user_id) VALUES (?,?)",
       [name, userId]
     );
   },

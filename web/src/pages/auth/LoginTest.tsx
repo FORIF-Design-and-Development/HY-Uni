@@ -87,6 +87,10 @@ export default function LoginTest() {
           비밀번호 재설정 테스트
         </button>
       </div>
+      
+      <button onClick={() => navigate("/timetable")} style={{ marginTop: 10 }}>
+        👉 시간표 페이지로 이동
+      </button>
 
       {error && (
         <div style={{ marginTop: 20, color: "red" }}>
