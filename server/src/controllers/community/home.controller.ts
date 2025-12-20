@@ -16,6 +16,11 @@ export async function getHomeData(
   next: NextFunction,
 ): Promise<void> {
   try {
+    // TODO: 개발용 임시 하드코딩 - 프로덕션 배포 전 제거 필요
+    const userId = 14;
+
+    // 아래 토큰 검증 코드는 임시로 주석 처리
+    /*
     // JWT 토큰 추출
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -53,6 +58,7 @@ export async function getHomeData(
       });
       return;
     }
+    */
 
     // 데이터 조회
     const [unReadNotificationCount, preferredKeywords, preferredTags, recommendedPosts, favoriteBoardsList] = await Promise.all([

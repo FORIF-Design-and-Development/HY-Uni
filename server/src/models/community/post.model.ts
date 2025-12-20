@@ -1478,6 +1478,7 @@ interface BoardPostListRow extends RowDataPacket {
   tag_names: string | null; // GROUP_CONCAT 결과
   image_url: string | null;
   video_url: string | null;
+  has_poll: number; // 0 or 1 (poll 존재 여부)
 }
 
 // 게시판별 게시글 목록 항목 타입
@@ -1511,6 +1512,7 @@ export interface BoardPostListItem {
     imageUrl: string | null;
     videoUrl: string | null;
   };
+  hasPoll: boolean; // poll 존재 여부
 }
 
 // 게시판별 게시글 목록 응답 타입
@@ -1583,6 +1585,7 @@ function toBoardPostListItem(row: BoardPostListRow): BoardPostListItem {
       imageUrl: row.image_url || null,
       videoUrl: row.video_url || null,
     },
+    hasPoll: row.has_poll === 1, // poll 존재 여부
   };
 }
 
@@ -1729,7 +1732,8 @@ export async function findPostsByBoardId(
         GROUP_CONCAT(DISTINCT t.tag_id ORDER BY t.tag_id) AS tag_ids,
         GROUP_CONCAT(DISTINCT t.name ORDER BY t.tag_id) AS tag_names,
         (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'image' LIMIT 1) AS image_url,
-        (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url
+        (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url,
+        (SELECT COUNT(*) > 0 FROM ${POLLS_TABLE} WHERE post_id = p.post_id) AS has_poll
       FROM ${POSTS_TABLE} AS p
       LEFT JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
       LEFT JOIN ${USERS_TABLE} AS u ON p.user_id = u.user_id
@@ -1933,7 +1937,8 @@ export async function findPostsByBoardId(
       GROUP_CONCAT(DISTINCT t.tag_id ORDER BY t.tag_id) AS tag_ids,
       GROUP_CONCAT(DISTINCT t.name ORDER BY t.tag_id) AS tag_names,
       (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'image' LIMIT 1) AS image_url,
-      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url
+      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url,
+      (SELECT COUNT(*) > 0 FROM ${POLLS_TABLE} WHERE post_id = p.post_id) AS has_poll
     FROM ${POSTS_TABLE} AS p
     LEFT JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
     LEFT JOIN ${USERS_TABLE} AS u ON p.user_id = u.user_id
