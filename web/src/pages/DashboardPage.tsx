@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { HylionWidget } from "../components/campus/HylionWidget";
 import { LibrarySeatsWidget } from "../components/campus/LibrarySeatsWidget";
@@ -120,28 +121,41 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full min-h-screen bg-white pb-24">
+
       {/* 1. 헤더 (브랜드 느낌 강조) */}
       <header className="px-5 pt-6 pb-4 bg-white sticky top-0 z-20 flex justify-between items-center bg-opacity-90 backdrop-blur-md">
         <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
           HY <span className="text-[#016ABF]">UNI</span>
         </h1>
-        <button className="relative p-2 -mr-2 text-gray-400 hover:text-[#016ABF] transition-colors">
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+
+        <div className="flex items-center gap-2">
+          <Link
+            to="/community"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#016ABF]/10 text-[#016ABF] hover:bg-[#016ABF]/20 transition-all active:scale-95 group"
+            aria-label="커뮤니티"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-            />
-          </svg>
-          {/* 알림 점 (Secondary Color) */}
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FE7716] border border-white"></span>
-        </button>
+            <MessageCircle className="w-4 h-4 group-hover:scale-110 transition-transform" strokeWidth={2.5} />
+            <span className="text-xs font-bold">커뮤니티</span>
+          </Link>
+
+          <button className="relative p-2 -mr-2 text-gray-400 hover:text-[#016ABF] transition-colors">
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
+            </svg>
+            {/* 알림 점 (Secondary Color) */}
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FE7716] border border-white"></span>
+          </button>
+        </div>
       </header>
 
       <div className="px-5 space-y-8">

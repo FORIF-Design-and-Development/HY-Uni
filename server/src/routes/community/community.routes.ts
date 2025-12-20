@@ -57,7 +57,7 @@ import { getHomeData } from '../../controllers/community/home.controller';
 const router = Router();
 
 // 홈 화면 데이터 조회
-router.get('/home', getHomeData);
+router.get('/home', requireAuth, getHomeData);
 
 // 게시판 목록 조회
 router.get('/boards', requireAuth, getBoards);

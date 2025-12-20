@@ -1,4 +1,5 @@
 import { create, type StateCreator } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "../api/auth/auth.api";
 import type { Department } from "../api/auth/department.api";
 
@@ -47,4 +48,9 @@ const authStoreCreator: StateCreator<AuthState> = (set) => ({
     }),
 });
 
-export const useAuthStore = create<AuthState>(authStoreCreator);
+export const useAuthStore = create<AuthState>()(
+  persist(authStoreCreator, {
+    name: "auth-storage",
+    storage: createJSONStorage(() => localStorage),
+  })
+);
