@@ -140,6 +140,7 @@ export interface PostDetailResponse {
       id: number;
       nickname: string;
       isPostAuthor: boolean;
+      isMine: boolean;
     };
     timestamps: {
       createdAt: string;
@@ -338,6 +339,39 @@ export async function createPost(
 ): Promise<CreatePostResponse> {
   const response = await api.post<ApiResponse<CreatePostResponse>>(
     `/community/boards/${boardId}/posts`,
+    payload
+  );
+  return response.data.data;
+}
+
+// 게시글 수정 요청 본문
+export interface UpdatePostRequest {
+  title?: string;
+  content?: string;
+  isAnonymous?: boolean;
+  tagIds?: number[];
+  attachments?: AttachmentItem[];
+}
+
+// 게시글 수정 응답
+export interface UpdatePostResponse {
+  postId: number;
+  message: string;
+  status: 'edited';
+}
+
+/**
+ * 게시글 수정
+ * @param postId 게시글 ID
+ * @param payload 게시글 수정 요청 본문
+ * @returns 수정된 게시글 정보
+ */
+export async function updatePost(
+  postId: number,
+  payload: UpdatePostRequest
+): Promise<UpdatePostResponse> {
+  const response = await api.patch<ApiResponse<UpdatePostResponse>>(
+    `/community/posts/${postId}`,
     payload
   );
   return response.data.data;

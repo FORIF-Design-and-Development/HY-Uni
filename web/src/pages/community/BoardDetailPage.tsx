@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Search, PenSquare, Heart, MessageCircle, Info, BarChart2 } from 'lucide-react';
+import { ArrowLeft, Search, PenSquare, Heart, MessageCircle, Info, BarChart2, Play } from 'lucide-react';
 import { getBoardPosts, BoardPostListItem } from '../../api/community/post.api';
 import { getBoards } from '../../api/community/board.api';
+import { getAbsoluteUrl } from '../../utils/url';
+import { toKST, getNowKST } from '../../utils/date';
 
 // 컴포넌트에서 사용하는 게시글 타입
 interface PostItem {
@@ -17,14 +19,19 @@ interface PostItem {
   hashtags?: string[];
   topHashtags?: string[];
   hasImage: boolean;
+  imageUrl: string | null;
+  hasVideo: boolean;
+  videoUrl: string | null;
   imageGray?: boolean;
   hasPoll?: boolean;
+  matchedTags?: string[]; // 매칭된 태그 이름들 (# 포함)
+  matchedKeywords?: string[]; // 매칭된 키워드들
 }
 
-// 상대 시간 포맷팅 함수
+// 상대 시간 포맷팅 함수 (한국 시간 기준)
 function formatRelativeTime(dateString: string): string {
-  const now = new Date();
-  const date = new Date(dateString);
+  const now = getNowKST();
+  const date = toKST(dateString);
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
@@ -49,11 +56,55 @@ function formatRelativeTime(dateString: string): string {
   return '방금 전';
 }
 
+// 키워드 하이라이팅 함수
+function highlightKeywords(text: string, keywords: string[]): React.ReactNode {
+  if (!keywords || keywords.length === 0) {
+    return text;
+  }
+
+  // 정규식 특수문자 이스케이프 처리
+  const escapedKeywords = keywords.map(kw => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  
+  // 정규식 패턴 생성 (대소문자 구분 없음)
+  const pattern = new RegExp(`(${escapedKeywords.join('|')})`, 'gi');
+  const parts = text.split(pattern);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        const isKeyword = keywords.some(kw => part.toLowerCase() === kw.toLowerCase());
+        return isKeyword ? (
+          <mark key={index} className="bg-blue-100 px-0.5 rounded font-medium">
+            {part}
+          </mark>
+        ) : (
+          <span key={index}>{part}</span>
+        );
+      })}
+    </>
+  );
+}
+
 // 서버 응답을 컴포넌트 형식으로 변환
-function mapPostItem(post: BoardPostListItem, isFreeBoard: boolean, boardName: string): PostItem {
+function mapPostItem(post: BoardPostListItem, isFreeBoard: boolean, boardName: string, isRecommendedBoard: boolean = false): PostItem {
+  // 매칭된 태그 이름들을 # 형태로 변환
+  const matchedTagNames = post.recommendationReason?.matchedTags || [];
+  const matchedTagsWithHash = matchedTagNames.map(tag => `#${tag}`);
+
+  // 배지 결정: 자유 게시판은 해시태그, 추천 게시판은 원문 게시판 이름, 그 외는 현재 게시판 이름
+  let badge: string;
+  if (isFreeBoard) {
+    badge = post.tags[0]?.name ? `#${post.tags[0].name}` : '';
+  } else if (isRecommendedBoard) {
+    // 추천 게시판일 때는 원문 게시판 이름 사용
+    badge = post.board.name;
+  } else {
+    badge = boardName;
+  }
+
   return {
     id: post.id,
-    badge: isFreeBoard ? (post.tags[0]?.name ? `#${post.tags[0].name}` : '') : boardName,
+    badge,
     badgeIsHashtag: isFreeBoard,
     title: post.title,
     content: post.contentSnippet || post.content,
@@ -63,8 +114,13 @@ function mapPostItem(post: BoardPostListItem, isFreeBoard: boolean, boardName: s
     hashtags: post.tags.map(tag => `#${tag.name}`),
     topHashtags: post.tags.slice(0, 3).map(tag => `#${tag.name}`),
     hasImage: post.previews.imageUrl !== null,
+    imageUrl: post.previews.imageUrl,
+    hasVideo: post.previews.videoUrl !== null,
+    videoUrl: post.previews.videoUrl,
     imageGray: false,
     hasPoll: post.hasPoll, // false 대신 post.hasPoll 사용
+    matchedTags: matchedTagsWithHash,
+    matchedKeywords: post.recommendationReason?.matchedKeywords || [],
   };
 }
 
@@ -83,6 +139,7 @@ const BoardDetailPage: React.FC = () => {
   // 하늘색 해시태그 갖는 게시판(자유, 동아리, 취업, 단과대) 여부 확인
   const isSkyBlueHashtagBoard = ['club', 'career', 'major'].includes(type || '');
   const isFreeBoard = type === 'free';
+  const isRecommendedBoard = type === 'recommended';
   
   // 검색, 작성 아이콘 표시 게시판(자유, 동아리, 취업, 단과대) 여부 확인
   const isWriteableBoard = ['free', 'club', 'career', 'major'].includes(type || '');
@@ -142,7 +199,7 @@ const BoardDetailPage: React.FC = () => {
           sortBy: 'latest',
         });
 
-        const mappedPosts = response.posts.map(post => mapPostItem(post, isFreeBoard, response.boardInfo.name));
+        const mappedPosts = response.posts.map(post => mapPostItem(post, isFreeBoard, response.boardInfo.name, isRecommendedBoard));
         setPosts(mappedPosts);
         
         // 게시판 이름과 설명 설정
@@ -184,6 +241,11 @@ const BoardDetailPage: React.FC = () => {
     navigate('/community/create', { state: { boardType: type, boardName: title, boardId } });
   };
 
+  const handleSearchClick = () => {
+    // 검색 페이지로 이동
+    navigate('/community/search');
+  };
+
   const showRightIcons = isWriteableBoard;
 
   return (
@@ -201,7 +263,10 @@ const BoardDetailPage: React.FC = () => {
         
         {showRightIcons && (
           <div className="absolute right-4 flex items-center gap-3 text-gray-900">
-            <button className="p-1">
+            <button 
+              className="p-1"
+              onClick={handleSearchClick}
+            >
               <Search className="w-6 h-6" />
             </button>
             <button 
@@ -252,7 +317,9 @@ const BoardDetailPage: React.FC = () => {
                   )}
 
                   <h3 className="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
-                      {post.title}
+                      {isRecommendedBoard && post.matchedKeywords && post.matchedKeywords.length > 0
+                        ? highlightKeywords(post.title, post.matchedKeywords)
+                        : post.title}
                       {post.hasPoll && (
                           <div className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded text-xs text-gray-500 font-medium">
                               <BarChart2 className="w-3 h-3" />
@@ -260,7 +327,11 @@ const BoardDetailPage: React.FC = () => {
                           </div>
                       )}
                   </h3>
-                  <p className="text-sm text-gray-500 mb-2">{post.content}</p>
+                  <p className="text-sm text-gray-500 mb-2">
+                    {isRecommendedBoard && post.matchedKeywords && post.matchedKeywords.length > 0
+                      ? highlightKeywords(post.content, post.matchedKeywords)
+                      : post.content}
+                  </p>
                   
                   <div className="flex items-center text-xs text-gray-400 gap-2 overflow-x-auto no-scrollbar">
                     <div className="flex items-center gap-0.5 shrink-0">
@@ -277,25 +348,57 @@ const BoardDetailPage: React.FC = () => {
                     
                     {/* 하단 해시태그 */}
                     <div className="flex gap-1 shrink-0">
-                      {(post.hashtags || []).map((tag, idx) => (
-                        <span 
-                          key={idx} 
-                          className={`px-2 py-0.5 rounded-sm shrink-0 ${
-                            (isSkyBlueHashtagBoard || isFreeBoard)
-                              ? 'bg-blue-100 text-gray-600' // 하늘색 해시태그 갖는 게시판(자유, 동아리, 취업, 단과대)
-                              : 'bg-orange-50 text-gray-600' // 기본 주황색/회색(동아리, 취업, 단과대)
-                          }`}
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      {/* 추천 게시판일 경우: 매칭된 태그만 표시 */}
+                      {isRecommendedBoard ? (
+                        post.matchedTags && post.matchedTags.length > 0 ? (
+                          post.matchedTags.map((tag, idx) => (
+                            <span 
+                              key={idx} 
+                              className="px-2 py-0.5 rounded-sm shrink-0 bg-orange-50 text-gray-600"
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : null
+                      ) : (
+                        // 일반 게시판: 모든 태그 표시
+                        (post.hashtags || []).map((tag, idx) => (
+                          <span 
+                            key={idx} 
+                            className={`px-2 py-0.5 rounded-sm shrink-0 ${
+                              (isSkyBlueHashtagBoard || isFreeBoard)
+                                ? 'bg-blue-100 text-gray-600' // 하늘색 해시태그 갖는 게시판(자유, 동아리, 취업, 단과대)
+                                : 'bg-orange-50 text-gray-600' // 기본 주황색/회색(동아리, 취업, 단과대)
+                            }`}
+                          >
+                            {tag}
+                          </span>
+                        ))
+                      )}
                     </div>
 
                   </div>
                 </div>
                 
-                {post.hasImage && (
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg shrink-0" />
+                {/* 이미지/동영상 미리보기 */}
+                {(post.hasImage || post.hasVideo) && (
+                  <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden bg-gray-200">
+                    {post.imageUrl ? (
+                      <img 
+                        src={getAbsoluteUrl(post.imageUrl)} 
+                        alt={post.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('이미지 로드 실패:', post.imageUrl);
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : post.hasVideo ? (
+                      <div className="w-full h-full flex items-center justify-center bg-black">
+                        <Play className="w-8 h-8 text-white" />
+                      </div>
+                    ) : null}
+                  </div>
                 )}
               </div>
             </div>

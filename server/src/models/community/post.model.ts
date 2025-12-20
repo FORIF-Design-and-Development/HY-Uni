@@ -222,6 +222,7 @@ export interface PostDetailResponse {
       id: number;
       nickname: string;
       isPostAuthor: boolean;
+      isMine: boolean;
     };
     timestamps: {
       createdAt: string;
@@ -1430,6 +1431,7 @@ export async function findPostDetailById(
         id: comment.userId,
         nickname: displayNickname,
         isPostAuthor: comment.userId === post.user_id,
+        isMine: currentUserId !== null && currentUserId === comment.userId,
       },
       timestamps: {
         createdAt: comment.createdAt.toISOString(),
