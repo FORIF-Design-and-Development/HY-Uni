@@ -4,6 +4,7 @@ import { FileText, Bell, Settings, ChevronRight, Heart, MessageCircle, Info, Sta
 import { KeywordItem, PostItem, FavoriteItem } from '../../types';
 import { motion } from 'framer-motion';
 import { getHomeData, type HomeDataResponse } from '../../api/community/home.api';
+import { toKST } from '../../utils/date';
 
 const CommunityHomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ const CommunityHomePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [homeData, setHomeData] = useState<HomeDataResponse | null>(null);
 
-  // Helper to get board type from name for Recommended posts
+  // 추천 게시글 게시판 타입 조회
   const getBoardType = (name: string) => {
     if (name.includes('자유')) return 'free';
     if (name.includes('취업') || name.includes('진로')) return 'career';
@@ -20,7 +21,7 @@ const CommunityHomePage: React.FC = () => {
     return 'generic';
   };
 
-  // Generate positions for keywords/hashtags (max 5 items)
+  // 선호 키워드/해시태그 위치 생성
   const generateKeywordPositions = (count: number): Array<{ top: string; left: string }> => {
     const positions = [
       { top: '15%', left: '30%' },
@@ -32,9 +33,9 @@ const CommunityHomePage: React.FC = () => {
     return positions.slice(0, Math.min(count, 5));
   };
 
-  // Format ISO date string to MM/DD and HH:MM
+  // ISO 날짜 문자열을 MM/DD 및 HH:MM 형식으로 변환 (한국 시간 기준)
   const formatDateTime = (isoString: string): { date: string; time: string } => {
-    const date = new Date(isoString);
+    const date = toKST(isoString);
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
@@ -45,9 +46,14 @@ const CommunityHomePage: React.FC = () => {
     };
   };
 
-  // Transform recommended posts from API to PostItem format
+  // 가장 최근 3개의 게시글만 반환
   const transformRecommendedPosts = (posts: HomeDataResponse['recommendedPosts']): PostItem[] => {
-    return posts.map((post) => {
+    // createdAt 기준 내림차순 정렬 후 상위 3개 게시글만 반환
+    const sortedPosts = [...posts]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3);
+    
+    return sortedPosts.map((post) => {
       const { date, time } = formatDateTime(post.createdAt);
       return {
         id: post.id,
@@ -62,7 +68,7 @@ const CommunityHomePage: React.FC = () => {
     });
   };
 
-  // Transform favorite boards from API to FavoriteItem format
+  // 즐겨찾기 게시판 데이터 변환
   const transformFavoriteBoards = (boards: HomeDataResponse['favoriteBoards']): FavoriteItem[] => {
     return boards.map((board) => {
       const boardType = getBoardType(board.name);
@@ -77,7 +83,7 @@ const CommunityHomePage: React.FC = () => {
           boardType,
         };
       }
-      // If no latest post, use current date/time as fallback
+      // 최신 게시글이 없으면 현재 날짜/시간을 기본값으로 사용
       const { date, time } = formatDateTime(new Date().toISOString());
       return {
         id: board.id,
@@ -90,7 +96,7 @@ const CommunityHomePage: React.FC = () => {
     });
   };
 
-  // Transform keywords to KeywordItem format with positions
+  // 선호 키워드 데이터 변환
   const transformKeywords = (keywords: Array<{ name: string }>): KeywordItem[] => {
     const positions = generateKeywordPositions(keywords.length);
     return keywords.slice(0, 5).map((keyword, index) => ({
@@ -101,10 +107,9 @@ const CommunityHomePage: React.FC = () => {
     }));
   };
 
-  // Transform hashtags to KeywordItem format with positions
-  // Select 5 random hashtags regardless of board type
+  // 선호 해시태그 데이터 변환
   const transformHashtags = (tags: Array<{ id: number; name: string }>): KeywordItem[] => {
-    // Shuffle array and take first 5
+    // 무작위로 (배열섞기 후 상위 5개) 해시태그 선택
     const shuffled = [...tags].sort(() => Math.random() - 0.5);
     const selectedTags = shuffled.slice(0, 5);
     
@@ -117,7 +122,7 @@ const CommunityHomePage: React.FC = () => {
     }));
   };
 
-  // Fetch home data on component mount
+  // 홈 데이터 조회
   useEffect(() => {
     const fetchHomeData = async () => {
       try {
@@ -136,7 +141,7 @@ const CommunityHomePage: React.FC = () => {
     fetchHomeData();
   }, []);
 
-  // Transform data for rendering
+  // 데이터 변환
   const preferredKeywords: KeywordItem[] = homeData
     ? transformKeywords(homeData.userPreferences.keywords)
     : [];
@@ -157,16 +162,16 @@ const CommunityHomePage: React.FC = () => {
 
   return (
     <div className="bg-white min-h-screen pb-10 font-sans">
-      {/* Top Header */}
+      {/* 상단 헤더 */}
       <header className="flex justify-between items-center px-5 py-4 bg-white sticky top-0 z-50 animate-fade-in-up">
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight">커뮤니티</h1>
         <div className="flex gap-4 text-gray-700">
-          {/* Version without notification badge */}
+          {/* 알림 뱃지 없는 버전 - 새로운 알림 없을 때때 */}
           <Link to="/community/board-list" className="p-1 hover:text-gray-900 transition-colors btn-press">
             <FileText className="w-6 h-6" />
           </Link>
           
-          {/* Version WITH notification badge (Red Dot) */}
+          {/* 알림 뱃지 있는 버전 - 새로운 알림 있을 때 */}
           <Link to="/community/notifications" className="p-1 hover:text-gray-900 transition-colors btn-press relative">
             <motion.div 
               animate={{ rotate: [0, -10, 10, -10, 10, 0] }}
@@ -179,7 +184,7 @@ const CommunityHomePage: React.FC = () => {
             )}
           </Link>
 
-          {/* Version without notification badge */}
+          {/* 설정 페이지 이동 */}
           <Link to="/community/settings" className="p-1 hover:text-gray-900 transition-colors btn-press">
             <Settings className="w-6 h-6" />
           </Link>
@@ -187,30 +192,30 @@ const CommunityHomePage: React.FC = () => {
       </header>
 
       <main className="px-5 space-y-8">
-        {/* Loading State */}
+        {/* 로딩 상태 */}
         {loading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
           </div>
         )}
 
-        {/* Error State */}
+        {/* 에러 상태 */}
         {error && !loading && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600 text-center">
             {error}
           </div>
         )}
 
-        {/* Content - Only show when not loading and no error */}
+        {/* 컨텐츠 - 로딩 중이 아니고 에러 없을 때 */}
         {!loading && !error && (
           <>
-            {/* Community Description Section */}
+            {/* 커뮤니티 설명 섹션 */}
             <section className="bg-gray-100 rounded-full py-2.5 px-4 flex items-center gap-2 text-gray-600 shadow-md animate-fade-in-up delay-75">
               <Info className="w-4 h-4 text-gray-500" />
               <span className="text-sm font-medium">커뮤니티 설명</span>
             </section>
 
-            {/* Preferred Keywords Section */}
+            {/* 선호 키워드 섹션 */}
             <section className="animate-fade-in-up delay-100">
               <div className="flex items-center gap-1 mb-3">
                 <h2 className="text-xl font-bold text-gray-900">선호 키워드</h2>
@@ -255,7 +260,7 @@ const CommunityHomePage: React.FC = () => {
               </div>
             </section>
 
-            {/* Preferred Hashtags Section */}
+            {/* 선호 해시태그 섹션 */}
             <section className="animate-fade-in-up delay-150">
               <div className="flex items-center gap-1 mb-3">
                 <h2 className="text-xl font-bold text-gray-900">선호 해시태그</h2>
@@ -300,7 +305,7 @@ const CommunityHomePage: React.FC = () => {
               </div>
             </section>
 
-            {/* Recommended Posts Section */}
+            {/* 추천 게시글 섹션 */}
             <section className="animate-fade-in-up delay-200">
               <h2 className="text-xl font-bold text-gray-900 mb-4">추천 게시판</h2>
               <div className="space-y-3">
@@ -357,7 +362,7 @@ const CommunityHomePage: React.FC = () => {
               </div>
             </section>
 
-            {/* Favorites Section */}
+            {/* 즐겨찾기 게시판 섹션 */}
             <section className="animate-fade-in-up delay-300">
               <h2 className="text-xl font-bold text-gray-900 mb-4">즐겨찾기</h2>
               <div className="space-y-3">

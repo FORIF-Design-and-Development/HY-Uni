@@ -11,7 +11,7 @@ import menuRoutes from "./campus/menu.routes";
 import { noticeRoutes } from "./campus/notice.routes";
 import { placeRoutes } from "./campus/place.routes";
 import seatsRoutes from "./campus/seats.routes";
-import reviewRouter from "./campus/timetable.review.routers";
+import reviewRouter from "./campus/timetable.review.routes";
 import timetableRoutes from "./campus/timetable.routes";
 import timetablesetsRoutes from "./campus/timetablesets.routes";
 import communityRoutes from "./community/community.routes";

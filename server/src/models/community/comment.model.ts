@@ -393,6 +393,48 @@ export async function findCommentReaction(
   return reaction === 'like' || reaction === 'dislike' ? reaction : null;
 }
 
+// 댓글 반응 배치 조회 (N+1 쿼리 문제 해결)
+export async function findCommentReactionsBatch(
+  commentIds: number[],
+  userId: number | null,
+): Promise<Map<number, 'like' | 'dislike' | null>> {
+  if (!userId || commentIds.length === 0) {
+    // 반응이 없는 경우 모든 댓글에 null 반환
+    const reactionMap = new Map<number, 'like' | 'dislike' | null>();
+    commentIds.forEach(id => reactionMap.set(id, null));
+    return reactionMap;
+  }
+
+  const placeholders = commentIds.map(() => '?').join(',');
+  const sql = `
+    SELECT comment_id, reaction
+    FROM ${COMMENT_REACTIONS_TABLE}
+    WHERE comment_id IN (${placeholders}) AND user_id = ?
+  `;
+
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [...commentIds, userId]);
+  
+  const reactionMap = new Map<number, 'like' | 'dislike' | null>();
+  
+  // 조회된 반응을 맵에 추가
+  rows.forEach((row: any) => {
+    const reaction = row.reaction;
+    reactionMap.set(
+      row.comment_id,
+      reaction === 'like' || reaction === 'dislike' ? reaction : null
+    );
+  });
+  
+  // 반응이 없는 댓글은 null로 설정
+  commentIds.forEach(id => {
+    if (!reactionMap.has(id)) {
+      reactionMap.set(id, null);
+    }
+  });
+  
+  return reactionMap;
+}
+
 // 댓글 반응 토글 함수
 export async function toggleCommentReaction(
   commentId: number,

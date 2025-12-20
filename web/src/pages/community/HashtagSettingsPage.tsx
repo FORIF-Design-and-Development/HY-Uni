@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Info, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getBoards, Board } from '../../api/community/board.api';
+import { Board } from '../../api/community/board.api';
 import {
-  getBoardTags,
-  getPreferredTags,
+  getAllBoardsTagsWithPreferences,
   addPreferredTags,
   deletePreferredTags,
   Tag,
@@ -23,7 +22,6 @@ const HashtagSettingsPage: React.FC = () => {
   
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingBoards, setLoadingBoards] = useState<Set<number>>(new Set());
   
   // State to track which accordion sections are open. Default: first one open.
   const [openSections, setOpenSections] = useState<Set<number>>(new Set([0]));
@@ -44,54 +42,36 @@ const HashtagSettingsPage: React.FC = () => {
       try {
         setIsLoading(true);
         
-        // Load boards
-        const boardsResponse = await getBoards();
-        let boardsList = boardsResponse.boards;
+        // 통합 API로 모든 게시판의 태그와 선호 태그를 한 번에 조회
+        const response = await getAllBoardsTagsWithPreferences();
         
         // Filter out boards without hashtags (나의 게시판, HOT/BEST 게시판, 추천 게시판)
         const excludedBoardNames = ['나의 게시판', 'HOT/BEST 게시판', '추천 게시판'];
-        boardsList = boardsList.filter(
-          (board) => !excludedBoardNames.includes(board.name)
+        const filteredBoards = response.boards.filter(
+          (board) => !excludedBoardNames.includes(board.boardName) && board.availableTags.length > 0
         );
         
-        // Load tags and preferred tags for each board
+        // 데이터를 기존 상태 구조에 맞게 변환
+        const boardsList: Board[] = filteredBoards.map(board => ({
+          id: board.boardId,
+          name: board.boardName,
+          parentBoardId: null,
+          isFavorite: false,
+          isSubscribed: false,
+        }));
+        
         const tagsMap = new Map<number, Tag[]>();
         const selectedTagsMap = new Map<number, Set<number>>();
-        const boardsWithTags: Board[] = [];
         
-        for (const board of boardsList) {
-          setLoadingBoards((prev) => new Set(prev).add(board.id));
-          
-          try {
-            // Load available tags
-            const tagsResponse = await getBoardTags(board.id);
-            const tags = tagsResponse.availableTags;
-            
-            // Only include boards that have tags
-            if (tags.length > 0) {
-              tagsMap.set(board.id, tags);
-              boardsWithTags.push(board);
-              
-              // Load preferred tags
-              const preferredTagsResponse = await getPreferredTags(board.id);
-              selectedTagsMap.set(
-                board.id,
-                new Set(preferredTagsResponse.preferredTags.map((tag) => tag.id))
-              );
-            }
-          } catch (err: any) {
-            console.error(`Failed to load tags for board ${board.id}:`, err);
-            // Skip boards with errors
-          } finally {
-            setLoadingBoards((prev) => {
-              const next = new Set(prev);
-              next.delete(board.id);
-              return next;
-            });
-          }
-        }
+        filteredBoards.forEach(board => {
+          tagsMap.set(board.boardId, board.availableTags);
+          selectedTagsMap.set(
+            board.boardId,
+            new Set(board.preferredTags.map((tag) => tag.id))
+          );
+        });
         
-        setBoards(boardsWithTags);
+        setBoards(boardsList);
         setBoardTags(tagsMap);
         setSelectedTags(selectedTagsMap);
       } catch (err: any) {
@@ -207,7 +187,6 @@ const HashtagSettingsPage: React.FC = () => {
               const isOpen = openSections.has(boardIndex);
               const selectedCount = getSelectedCount(board.id);
               const tags = boardTags.get(board.id) || [];
-              const isLoadingTags = loadingBoards.has(board.id);
 
               return (
                 <div 
@@ -243,11 +222,7 @@ const HashtagSettingsPage: React.FC = () => {
                         transition={{ duration: 0.2, ease: "easeInOut" }}
                       >
                         <div className="p-4 pt-0 bg-white border-t border-gray-100">
-                          {isLoadingTags ? (
-                            <div className="flex justify-center items-center py-4">
-                              <span className="text-gray-400 text-xs">태그를 불러오는 중...</span>
-                            </div>
-                          ) : tags.length === 0 ? (
+                          {tags.length === 0 ? (
                             <div className="flex justify-center items-center py-4">
                               <span className="text-gray-400 text-xs">사용 가능한 태그가 없습니다.</span>
                             </div>

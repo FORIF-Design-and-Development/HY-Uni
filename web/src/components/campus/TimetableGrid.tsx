@@ -2,56 +2,70 @@ import { useTimetableStore } from "../../store/timetable.store";
 
 const days = ["월", "화", "수", "목", "금", "토"];
 
-// "HH:MM:SS" → 0~30 슬롯
-function timeToSlot(time: any) {
-  if (!time || time === "-") return null;
+// period(숫자)도, "HH:MM:SS"(문자열)도 슬롯으로 변환
+function timeToSlot(periodOrTime: number | string | null) {
+  if (periodOrTime == null) return null;
 
-  // 숫자(period) 처리
-  if (typeof time === "number") {
-    return (time - 1) * 2; // 1교시 → 0, 2교시 → 2
+  // 숫자면 교시 기반 슬롯 (예: 1교시=0, 1.5교시=1, ...)
+  if (typeof periodOrTime === "number") {
+    if (isNaN(periodOrTime)) return null;
+    return Math.round((periodOrTime - 1) * 2);
   }
 
-  if (typeof time !== "string" || !time.includes(":")) return null;
+  // 문자열 "13:00:00" 또는 "13:00" 처리
+  if (typeof periodOrTime === "string") {
+    if (periodOrTime === "-" || periodOrTime.trim() === "") return null;
+    if (!periodOrTime.includes(":")) return null;
 
-  const [h, m] = time.split(":").map(Number);
+    const [hStr, mStr] = periodOrTime.split(":");
+    const h = Number(hStr);
+    const m = Number(mStr);
 
-  if (h === 24 && m === 0) return 30;
+    if (isNaN(h) || isNaN(m)) return null;
 
-  return (h - 9) * 2 + (m >= 30 ? 1 : 0);
+    // 09:00을 0 슬롯으로 맞춤 (30분 단위)
+    return (h - 9) * 2 + (m >= 30 ? 1 : 0);
+  }
+
+  return null;
 }
 
-
-
-// ✅ slot → "09:00" format
+/** slot → HH:MM 변환 */
 function slotToTime(slot: number) {
   const totalMin = 9 * 60 + slot * 30;
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 export default function TimetableGrid() {
-  const { selectedCourses, removeCourse, removeIncomplete } =
+  // ✅ [수정] store 설계에 맞게 incompleteCourses를 직접 사용
+  const { selectedCourses, incompleteCourses, removeCourse, removeIncomplete } =
     useTimetableStore();
 
-  const validCourses = selectedCourses.filter(
-    (c) =>
-      c.day && c.start_time != null && c.end_time != null
-  );
+  /** 🔥 여기 조건이 틀리면 시간 지정 강의도 미지정으로 들어감 */
+  // Number(...)로 판별하지 말고 timeToSlot 결과로 판별해야 "13:00:00"도 통과함
+  const validCourses = selectedCourses.filter((c) => {
+    const s = timeToSlot(c.start_time);
+    const e = timeToSlot(c.end_time);
 
+    return (
+      c.day &&
+      c.day !== "-" &&          // 요일 '-'(미지정)은 그리드에 안 올림
+      s != null &&
+      e != null &&
+      e > s                      // 최소한의 유효성(끝 > 시작)
+    );
+  });
 
-  const incomplete = selectedCourses.filter(
-    (c) =>
-      !c.day ||
-      !c.start_time ||
-      c.start_time === "-" ||
-      (typeof c.start_time === "string" && !c.start_time.includes(":"))
-  );
+  // ✅ [수정] 미지정은 store(incompleteCourses)가 source of truth
+  // - 로딩 단계에서 이미 분리된 결과를 그대로 사용해야 idx 삭제도 정확함
+  const incomplete = incompleteCourses;
 
   return (
     <div
       style={{
-        flex: 1.6,
+        // flex: 1.6,
         backgroundColor: "#ffffff",
         borderRadius: 12,
         padding: 16,
@@ -82,7 +96,7 @@ export default function TimetableGrid() {
         <tbody>
           {Array.from({ length: 30 }, (_, slot) => (
             <tr key={slot}>
-              {/* 교시(시간)정보 */}
+              {/* 교시 표시 */}
               {slot % 2 === 0 && (
                 <td
                   rowSpan={2}
@@ -92,19 +106,15 @@ export default function TimetableGrid() {
                     color: "#0E4A84",
                     textAlign: "center",
                     padding: 4,
-                    width: 82
+                    width: 82,
                   }}
                 >
-                  <div style={{ fontWeight: 600 }}>
-                    {slot / 2 + 1}교시
-                  </div>
+                  <div style={{ fontWeight: 600 }}>{slot / 2 + 1}교시</div>
                   <div style={{ fontSize: 10, color: "#898C8E" }}>
                     {slotToTime(slot)} ~ {slotToTime(slot + 2)}
                   </div>
                 </td>
               )}
-
-
 
               {days.map((day) => {
                 const course = validCourses.find((c) => {
@@ -115,7 +125,8 @@ export default function TimetableGrid() {
                 const covered = validCourses.some((c) => {
                   const s = timeToSlot(c.start_time);
                   const e = timeToSlot(c.end_time);
-                  return c.day === day && s! < slot && e! > slot;
+                  if (s == null || e == null) return false;
+                  return c.day === day && s < slot && e > slot;
                 });
 
                 if (covered) return null;
@@ -133,6 +144,7 @@ export default function TimetableGrid() {
                   );
                 }
 
+                // 강의 칸 span 계산
                 const s = timeToSlot(course.start_time)!;
                 const e = timeToSlot(course.end_time)!;
                 const span = e - s;
@@ -153,7 +165,8 @@ export default function TimetableGrid() {
                   >
                     <button
                       onClick={() => {
-                        if (!window.confirm("해당 강의를 삭제하시겠습니까?")) return;
+                        if (!window.confirm("해당 강의를 삭제하시겠습니까?"))
+                          return;
                         removeCourse(
                           course.course_id,
                           course.day,
@@ -162,7 +175,7 @@ export default function TimetableGrid() {
                         );
                       }}
                       style={{
-                        position: "absolute",
+                        position: "absolute", // ✅ [수정]
                         top: 4,
                         right: 4,
                         width: 18,
@@ -181,16 +194,8 @@ export default function TimetableGrid() {
                     <div style={{ fontWeight: 700 }}>{course.course_name}</div>
                     <div>{course.professor || "-"}</div>
                     <div style={{ fontSize: 10 }}>
-                      {course.day}{" "}
-                      {typeof course.start_time === "string"
-                        ? course.start_time.slice(0, 5)
-                        : slotToTime(timeToSlot(course.start_time)!)}
-                      ~
-                      {typeof course.end_time === "string"
-                        ? course.end_time.slice(0, 5)
-                        : slotToTime(timeToSlot(course.end_time)!)}
+                      {course.day} {slotToTime(s)} ~ {slotToTime(e)}
                     </div>
-
                     <div style={{ fontSize: 10, marginTop: 4 }}>
                       {course.location}
                     </div>
@@ -200,7 +205,7 @@ export default function TimetableGrid() {
             </tr>
           ))}
 
-          {/* ✅ 미지정 */}
+          {/* 미지정 강의 */}
           <tr>
             <td
               colSpan={days.length + 1}

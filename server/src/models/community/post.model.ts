@@ -2,7 +2,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/prom
 import { pool } from '../../config/db';
 import { findBoardById } from './board.model';
 import { findTagsByPostId } from './tag.model';
-import { findCommentsByPostId, findCommentReaction, containsFilterKeyword, checkCommentExists, COMMENTS_TABLE, COMMENT_REACTIONS_TABLE } from './comment.model';
+import { findCommentsByPostId, findCommentReaction, findCommentReactionsBatch, containsFilterKeyword, COMMENTS_TABLE, COMMENT_REACTIONS_TABLE } from './comment.model';
 import { findFilterKeywordsByUserId } from './filter-keyword.model';
 import { findPreferredKeywordsByUserId } from './preferred-keyword.model';
 import { findAllPreferredTagsByUserId } from './preferred-tag.model';
@@ -104,7 +104,7 @@ export interface PostScrapResult {
 export interface PostVoteResult {
   pollId: number;
   userVote: {
-    selectedOptionId: number;
+    selectedOptionId: number | null;
   };
   results: Array<{
     id: number;
@@ -222,6 +222,7 @@ export interface PostDetailResponse {
       id: number;
       nickname: string;
       isPostAuthor: boolean;
+      isMine: boolean;
     };
     timestamps: {
       createdAt: string;
@@ -984,6 +985,73 @@ export async function votePostPoll(
   }
 }
 
+// 게시글 투표 취소 함수 (트랜잭션 통합 함수)
+export async function removePostVote(
+  postId: number,
+  userId: number,
+): Promise<PostVoteResult> {
+  const connection = await pool.getConnection();
+  try {
+    // 트랜잭션 시작
+    await connection.beginTransaction();
+
+    // 게시글 존재 여부 확인
+    const post = await findPostById(postId);
+    if (!post) {
+      throw new Error('POST_NOT_FOUND');
+    }
+
+    // 투표 존재 여부 확인
+    const poll = await findPollByPostId(postId);
+    if (!poll) {
+      throw new Error('POLL_NOT_FOUND');
+    }
+
+    // 사용자 기존 투표 확인
+    const existingVote = await findUserVote(poll.poll_id, userId);
+    if (existingVote === null) {
+      throw new Error('NO_VOTE_FOUND');
+    }
+
+    // poll_vote 테이블에서 DELETE
+    await connection.execute(
+      `DELETE FROM ${POLL_VOTES_TABLE} WHERE poll_id = ? AND user_id = ?`,
+      [poll.poll_id, userId],
+    );
+
+    // poll_options 테이블에서 최신 vote_count 조회 (트리거로 자동 업데이트됨) - 트랜잭션 내에서 조회
+    const [pollOptionRows] = await connection.query<PollOptionRow[]>(
+      `
+        SELECT option_id, poll_id, option_text, vote_count
+        FROM ${POLL_OPTIONS_TABLE}
+        WHERE poll_id = ?
+        ORDER BY option_id ASC
+      `,
+      [poll.poll_id],
+    );
+    const pollOptions = pollOptionRows;
+
+    await connection.commit();
+
+    return {
+      pollId: poll.poll_id,
+      userVote: {
+        selectedOptionId: null,
+      },
+      results: pollOptions.map((option) => ({
+        id: option.option_id,
+        text: option.option_text,
+        voteCount: option.vote_count,
+      })),
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 // 게시글 반응 조회
 async function findPostReaction(
   postId: number,
@@ -1203,31 +1271,45 @@ export async function findPostDetailById(
   postId: number,
   currentUserId: number | null,
 ): Promise<PostDetailResponse | null> {
-  // 게시글 기본 정보 조회
+  // 게시글 기본 정보 조회 (다른 쿼리들의 전제조건)
   const post = await findPostById(postId);
   if (!post) return null;
 
-  // view_count 증가
-  try {
-    await incrementViewCount(postId, currentUserId);
-  } catch (error) {
-    // view_count 증가 실패해도 조회는 계속 진행
+  // view_count 증가 (비동기 처리, 실패해도 조회는 계속 진행)
+  incrementViewCount(postId, currentUserId).catch((error) => {
     console.error('Failed to increment view count:', error);
-  }
+  });
 
-  // 게시판 정보 조회
-  const board = await findBoardById(post.board_id);
+  // 병렬 실행 가능한 독립적인 쿼리들
+  const [
+    board,
+    tags,
+    attachments,
+    reaction,
+    isScrapped,
+    poll,
+    comments,
+    filterKeywordsResult,
+  ] = await Promise.all([
+    findBoardById(post.board_id),
+    findTagsByPostId(postId),
+    findAttachmentsByPostId(postId),
+    findPostReaction(postId, currentUserId),
+    isPostScrapped(postId, currentUserId),
+    findPollByPostId(postId),
+    findCommentsByPostId(postId, currentUserId, post.user_id),
+    currentUserId
+      ? findFilterKeywordsByUserId(currentUserId).then((k) => k.map((kw) => kw.name))
+      : Promise.resolve([]),
+  ]);
+
   if (!board) return null;
 
   // 작성자 정보 조회
   const authorUserId = post.user_id;
   const authorNickname = post.is_anonymous ? '익명' : (post.user_nickname || '익명');
 
-  // 태그 조회
-  const tags = await findTagsByPostId(postId);
-
-  // 첨부파일 조회
-  const attachments = await findAttachmentsByPostId(postId);
+  // 첨부파일 처리
   const images = attachments
     .filter((a) => a.type === 'image')
     .map((a) => ({ url: a.url }));
@@ -1235,16 +1317,14 @@ export async function findPostDetailById(
     .filter((a) => a.type === 'video')
     .map((a) => ({ url: a.url }));
 
-  // 사용자 상호작용 조회
-  const reaction = await findPostReaction(postId, currentUserId);
-  const isScrapped = await isPostScrapped(postId, currentUserId);
-
-  // 투표 정보 조회
+  // 투표 정보 조회 (poll이 있을 때만)
   let pollData = null;
-  const poll = await findPollByPostId(postId);
   if (poll) {
-    const pollOptions = await findPollOptionsByPollId(poll.poll_id);
-    const userVoteOptionId = await findUserVote(poll.poll_id, currentUserId);
+    // 투표 옵션과 사용자 투표는 병렬로 조회 가능
+    const [pollOptions, userVoteOptionId] = await Promise.all([
+      findPollOptionsByPollId(poll.poll_id),
+      findUserVote(poll.poll_id, currentUserId),
+    ]);
 
     pollData = {
       id: poll.poll_id,
@@ -1261,15 +1341,8 @@ export async function findPostDetailById(
     };
   }
 
-  // 댓글 조회
-  const comments = await findCommentsByPostId(postId, currentUserId, post.user_id);
-
-  // 사용자의 필터링 키워드 조회 (로그인한 사용자만)
-  let filterKeywords: string[] = [];
-  if (currentUserId) {
-    const filterKeywordsWithId = await findFilterKeywordsByUserId(currentUserId);
-    filterKeywords = filterKeywordsWithId.map((k) => k.name);
-  }
+  // 필터링 키워드
+  const filterKeywords = filterKeywordsResult;
 
   // 1단계: 모든 댓글을 시간순으로 정렬하여 익명 번호 부여
   const sortedCommentsByTime = [...comments].sort((a, b) => 
@@ -1287,16 +1360,19 @@ export async function findPostDetailById(
     }
   }
 
+  // 댓글 반응 배치 조회 (N+1 쿼리 문제 해결)
+  const commentIds = comments.map(c => c.id);
+  const commentReactionsMap = await findCommentReactionsBatch(commentIds, currentUserId);
+
   // 댓글 계층 구조 구성
   const commentMap = new Map<number, any>();
   const rootComments: any[] = [];
 
   for (const comment of comments) {
-    const commentReaction = await findCommentReaction(comment.id, currentUserId);
+    const commentReaction = commentReactionsMap.get(comment.id) || null;
 
-    // 원본 댓글 정보 조회 (필터링 전 원본 content 확인용)
-    const originalComment = await checkCommentExists(comment.id);
-    const originalContent = originalComment ? originalComment.content : comment.content;
+    // 원본 댓글 정보는 이미 findCommentsByPostId에서 가져온 데이터 사용
+    const originalContent = comment.content;
 
     // 댓글 처리 우선순위에 따라 처리
     let displayNickname: string;
@@ -1355,6 +1431,7 @@ export async function findPostDetailById(
         id: comment.userId,
         nickname: displayNickname,
         isPostAuthor: comment.userId === post.user_id,
+        isMine: currentUserId !== null && currentUserId === comment.userId,
       },
       timestamps: {
         createdAt: comment.createdAt.toISOString(),
@@ -1458,6 +1535,10 @@ export interface BoardPostListOptions {
   pageSize: number;
   sortBy: BoardPostSortBy;
   userId?: number; // 필터 키워드 적용을 위한 사용자 ID (선택적)
+  // 중복 쿼리 방지를 위한 옵션 (이미 조회한 데이터 재사용)
+  preferredKeywords?: Array<{ id: number; name: string }>; // 이미 조회한 선호 키워드
+  preferredTags?: Array<{ id: number; name: string }>; // 이미 조회한 선호 태그
+  filterKeywords?: string[]; // 이미 조회한 필터 키워드
 }
 
 // 게시판별 게시글 목록 Row 타입
@@ -1623,10 +1704,14 @@ export async function findPostsByBoardId(
       };
     }
 
-    // 선호 키워드 조회
-    const preferredKeywords = await findPreferredKeywordsByUserId(userId);
-    // 모든 선호 태그 조회
-    const preferredTags = await findAllPreferredTagsByUserId(userId);
+    // 선호 키워드 조회 (이미 조회한 데이터가 있으면 재사용)
+    const preferredKeywords = options.preferredKeywords 
+      ? options.preferredKeywords.map(k => ({ id: k.id, name: k.name }))
+      : await findPreferredKeywordsByUserId(userId);
+    // 모든 선호 태그 조회 (이미 조회한 데이터가 있으면 재사용)
+    const preferredTags = options.preferredTags 
+      ? options.preferredTags
+      : await findAllPreferredTagsByUserId(userId);
 
     // 선호 키워드/태그가 없으면 빈 결과 반환
     if (preferredKeywords.length === 0 && preferredTags.length === 0) {
@@ -1646,9 +1731,10 @@ export async function findPostsByBoardId(
       };
     }
 
-    // 사용자의 필터 키워드 조회
-    const filterKeywordsWithId = await findFilterKeywordsByUserId(userId);
-    const filterKeywords = filterKeywordsWithId.map((k) => k.name);
+    // 사용자의 필터 키워드 조회 (이미 조회한 데이터가 있으면 재사용)
+    const filterKeywords = options.filterKeywords 
+      ? options.filterKeywords
+      : (await findFilterKeywordsByUserId(userId)).map((k) => k.name);
 
     // 필터 키워드 제외 조건 생성
     let filterKeywordConditions = '';
@@ -2075,15 +2161,31 @@ export function convertBoardPostListToRecommendedPosts(
 export async function findRecommendedPostsByUserId(
   userId: number,
   limit: number = 10,
+  preferredKeywords?: Array<{ id: number; name: string }>,
+  preferredTags?: Array<{ id: number; name: string }>,
+  filterKeywords?: string[],
 ): Promise<RecommendedPost[]> {
   // findPostsByBoardId를 boardId=2(추천 게시판)로 호출하여 추천 게시글 조회
-  const response = await findPostsByBoardId({
+  const options: BoardPostListOptions = {
     boardId: 2,
     page: 1,
     pageSize: limit,
     sortBy: 'latest',
     userId,
-  });
+  };
+  
+  // 옵셔널 파라미터가 있을 때만 추가
+  if (preferredKeywords) {
+    options.preferredKeywords = preferredKeywords;
+  }
+  if (preferredTags) {
+    options.preferredTags = preferredTags;
+  }
+  if (filterKeywords) {
+    options.filterKeywords = filterKeywords;
+  }
+  
+  const response = await findPostsByBoardId(options);
 
   // BoardPostListItem[]를 RecommendedPost[]로 변환
   return convertBoardPostListToRecommendedPosts(response.posts);
@@ -2161,32 +2263,77 @@ export interface FavoriteBoardWithLatestPost {
   } | null;
 }
 
-// 즐겨찾기 게시판과 최신 게시글 조회
+// 즐겨찾기 게시판과 최신 게시글 조회 (배치 쿼리로 최적화)
 export async function findFavoriteBoardsWithLatestPost(
   favoriteBoards: Array<{ id: number; name: string; createdAt: Date }>,
 ): Promise<FavoriteBoardWithLatestPost[]> {
-  const result: FavoriteBoardWithLatestPost[] = [];
-
-  for (const board of favoriteBoards) { // 즐겨찾기 게시판의 각 요소를 순회
-    const latestPost = await findLatestPostByBoardId(board.id); // 즐겨찾기 게시판의 최신 게시글 조회
-    
-    result.push({
-      id: board.id,
-      name: board.name,
-      latestPost: latestPost
-        ? {
-            id: latestPost.id,
-            title: latestPost.title,
-            contentPreview: latestPost.contentPreview,
-            likesCount: latestPost.likesCount,
-            commentCount: latestPost.commentCount,
-            createdAt: latestPost.createdAt,
-          }
-        : null,
-    });
+  // 즐겨찾기 게시판이 없으면 빈 배열 반환
+  if (favoriteBoards.length === 0) {
+    return [];
   }
 
-  return result;
+  // 게시판 ID 배열 추출
+  const boardIds = favoriteBoards.map(board => board.id);
+
+  // 모든 게시판의 최신 게시글을 한 번의 쿼리로 조회 (윈도우 함수 사용)
+  const sql = `
+    SELECT
+      p.post_id,
+      p.title,
+      p.content,
+      p.like_count,
+      p.comment_count,
+      p.created_at,
+      p.board_id,
+      b.name AS board_name,
+      ROW_NUMBER() OVER (PARTITION BY p.board_id ORDER BY p.created_at DESC) AS rn
+    FROM ${POSTS_TABLE} AS p
+    INNER JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
+    WHERE p.board_id IN (${boardIds.map(() => '?').join(',')})
+      AND p.status IN ('published', 'edited')
+  `;
+
+  interface LatestPostRow extends RowDataPacket {
+    post_id: number;
+    title: string;
+    content: string;
+    like_count: number;
+    comment_count: number;
+    created_at: Date;
+    board_id: number;
+    board_name: string;
+    rn: number;
+  }
+
+  const [rows] = await pool.query<LatestPostRow[]>(sql, boardIds);
+
+  // 각 게시판별로 최신 게시글만 필터링 (rn = 1)
+  const latestPostsByBoardId = new Map<number, LatestPostRow>();
+  for (const row of rows) {
+    if (row.rn === 1 && !latestPostsByBoardId.has(row.board_id)) {
+      latestPostsByBoardId.set(row.board_id, row);
+    }
+  }
+
+  // 즐겨찾기 게시판 순서대로 결과 구성
+  return favoriteBoards.map(board => {
+    const latestPostRow = latestPostsByBoardId.get(board.id);
+    
+    return {
+      id: board.id,
+      name: board.name,
+      latestPost: latestPostRow
+        ? {
+            id: latestPostRow.post_id,
+            title: latestPostRow.title,
+            contentPreview: extractContentPreview(latestPostRow.content),
+            likesCount: latestPostRow.like_count,
+            commentCount: latestPostRow.comment_count,
+            createdAt: new Date(latestPostRow.created_at).toISOString(),
+          }
+        : null,
+    };
+  });
 }
 
 

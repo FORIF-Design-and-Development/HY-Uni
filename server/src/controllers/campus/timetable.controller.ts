@@ -5,7 +5,8 @@ export const getTimetable = async (req: Request, res: Response, next: NextFuncti
   try {
     const setId = Number(req.query.setId);
 
-    if (!setId) {
+    // NaN까지 거르는 유효성 체크
+    if (!Number.isFinite(setId) || setId <= 0) {
       return res.status(400).json({ error: "setId is required" });
     }
 
@@ -20,7 +21,8 @@ export const resetTimetable = async (req: Request, res: Response, next: NextFunc
   try {
     const setId = Number(req.query.setId);
 
-    if (setId == null) {
+    // (setId == null)는 NaN을 못 잡음
+    if (!Number.isFinite(setId) || setId <= 0) {
       return res.status(400).json({ error: "setId is required" });
     }
 
@@ -33,17 +35,24 @@ export const resetTimetable = async (req: Request, res: Response, next: NextFunc
 
 export const addCourseToTimetable = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const setId = Number(req.body.setId);
-    const courseId = Number(req.body.courseId);
-    const day = req.body.day || null;
-    const start = req.body.start != null ? Number(req.body.start) : null;
-    const end = req.body.end != null ? Number(req.body.end) : null;
+    const { setId, courseId, day, start, end } = req.body;
 
-    if (!setId || !courseId) {
+    // 숫자 유효성까지 체크 (NaN 방지)
+    const nSetId = Number(setId);
+    const nCourseId = Number(courseId);
+
+    if (!Number.isFinite(nSetId) || !Number.isFinite(nCourseId) || nSetId <= 0 || nCourseId <= 0) {
       return res.status(400).json({ error: "setId and courseId are required" });
     }
 
-    await TimetableModel.addCourseToSet(setId, courseId, day, start, end);
+    await TimetableModel.addCourseToSet(
+      nSetId,
+      nCourseId,
+      day ?? null,
+      start ?? null,
+      end ?? null
+    );
+
     res.json({ success: true });
   } catch (err) {
     next(err);
