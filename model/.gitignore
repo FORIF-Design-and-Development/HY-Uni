@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+.venv/
+.checkpoints
+.DS_Store
+
+data/
+vectorstores/
+results/
+models/
