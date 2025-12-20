@@ -1,0 +1,35 @@
+cloudbuild.server.yaml
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'build',
+        '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-server:${COMMIT_SHA}',
+        '-f', 'server/Dockerfile',
+        'server'
+      ]
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'push',
+        '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-server:${COMMIT_SHA}'
+      ]
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      [
+        'run', 'deploy', 'hyuni-server',
+        '--image', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hy-uni-api:${COMMIT_SHA}',
+        '--region', '${_REGION}',
+        '--platform', 'managed',
+        '--allow-unauthenticated'
+      ]
+
+substitutions:
+  _REGION: asia-northeast3
+  _AR_REPO: hyuni
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hy-uni-api:${COMMIT_SHA}'

@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "public": "web/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+            "serviceId": "hyuni-api",
+            "region": "asia-northeast3"
+        },
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

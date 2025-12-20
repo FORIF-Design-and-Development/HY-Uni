@@ -50,7 +50,6 @@ def chat(req: ChatRequest):
     result: Dict[str, Any] = session.ask(
         question=req.question,
         k=5,
-        source_title=None,
         model="gpt-4o-mini",
     )
 

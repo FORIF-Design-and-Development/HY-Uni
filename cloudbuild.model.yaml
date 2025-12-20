@@ -1,0 +1,33 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'build',
+        '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-model:${COMMIT_SHA}',
+        '-f', 'model/Dockerfile',
+        'model'
+      ]
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'push',
+        '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-model:${COMMIT_SHA}'
+      ]
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      [
+        'run', 'deploy', 'hyuni-model',
+        '--image', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-model:${COMMIT_SHA}',
+        '--region', '${_REGION}',
+        '--platform', 'managed',
+        '--allow-unauthenticated'
+      ]
+
+substitutions:
+  _REGION: asia-northeast3
+  _AR_REPO: hyuni
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-model:${COMMIT_SHA}'
