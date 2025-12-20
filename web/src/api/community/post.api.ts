@@ -45,6 +45,7 @@ export interface BoardPostListItem {
     imageUrl: string | null;
     videoUrl: string | null;
   };
+  hasPoll: boolean; // 투표 여부
 }
 
 // 게시판 정보
@@ -98,6 +99,53 @@ export async function getBoardPosts(
     `/community/boards/${boardId}/posts?${params.toString()}`
   );
 
+  return response.data.data;
+}
+
+// 첨부파일 타입
+export interface AttachmentItem {
+  type: 'IMAGE' | 'VIDEO';
+  url: string;
+}
+
+// 투표 페이로드 타입
+export interface PollPayload {
+  question: string;
+  options: string[];
+  expiredAt?: string | null;
+}
+
+// 게시글 생성 요청 본문
+export interface CreatePostRequest {
+  title: string;
+  content: string;
+  isAnonymous?: boolean;
+  tagIds?: number[];
+  attachments?: AttachmentItem[];
+  poll?: PollPayload | null;
+}
+
+// 게시글 생성 응답
+export interface CreatePostResponse {
+  postId: number;
+  message: string;
+  status: string;
+}
+
+/**
+ * 게시글 생성
+ * @param boardId 게시판 ID
+ * @param payload 게시글 생성 요청 본문
+ * @returns 생성된 게시글 정보
+ */
+export async function createPost(
+  boardId: number,
+  payload: CreatePostRequest
+): Promise<CreatePostResponse> {
+  const response = await api.post<ApiResponse<CreatePostResponse>>(
+    `/community/boards/${boardId}/posts`,
+    payload
+  );
   return response.data.data;
 }
 
