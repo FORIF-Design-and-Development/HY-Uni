@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Info, X } from 'lucide-react';
+import {
+  getPreferredKeywords,
+  addPreferredKeywords,
+  deletePreferredKeywords,
+  PreferredKeyword,
+} from '../../api/community/preferred-keyword.api';
 
 const KeywordSettingsPage: React.FC = () => {
   const navigate = useNavigate();
-  // Initial state based on the mockup data
-  const [keywords, setKeywords] = useState<string[]>(['크리스마스', '크리스마스', '크리스마스', '크리스마스']);
+  // State structure changed from string[] to PreferredKeyword[]
+  const [keywords, setKeywords] = useState<PreferredKeyword[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   
   // Toast state
   const [showToast, setShowToast] = useState(false);
@@ -18,24 +25,68 @@ const KeywordSettingsPage: React.FC = () => {
     setTimeout(() => setShowToast(false), 2000);
   };
 
-  const handleAddKeyword = () => {
+  // Load preferred keywords on component mount
+  useEffect(() => {
+    const loadKeywords = async () => {
+      try {
+        setIsLoading(true);
+        const response = await getPreferredKeywords();
+        setKeywords(response.preferredKeywords);
+      } catch (err: any) {
+        const errorMessage =
+          err.response?.data?.error?.message || '키워드를 불러오는 중 오류가 발생했습니다.';
+        triggerToast(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadKeywords();
+  }, []);
+
+  const handleAddKeyword = async () => {
     if (!inputValue.trim()) return;
 
+    const trimmedValue = inputValue.trim();
+
+    // Check local duplicate (UX improvement)
+    if (keywords.some((kw) => kw.name === trimmedValue)) {
+      triggerToast('이미 추가된 키워드입니다.');
+      return;
+    }
+
+    // Check max limit
     if (keywords.length >= 5) {
       triggerToast('키워드는 최대 5개까지 설정 가능합니다.');
       return;
     }
 
-    setKeywords([inputValue.trim(), ...keywords]);
-    setInputValue('');
+    try {
+      const response = await addPreferredKeywords([trimmedValue]);
+      setKeywords(response.preferredKeywords);
+      setInputValue('');
+    } catch (err: any) {
+      const errorMessage =
+        err.response?.data?.error?.message || '키워드 추가 중 오류가 발생했습니다.';
+      triggerToast(errorMessage);
+    }
   };
 
-  const handleRemoveKeyword = (indexToRemove: number) => {
+  const handleRemoveKeyword = async (keywordId: number) => {
+    // Check min limit
     if (keywords.length <= 1) {
       triggerToast('선호 키워드는 최소 1개 이상 설정해야 합니다.');
       return;
     }
-    setKeywords(keywords.filter((_, index) => index !== indexToRemove));
+
+    try {
+      const response = await deletePreferredKeywords([keywordId]);
+      setKeywords(response.preferredKeywords);
+    } catch (err: any) {
+      const errorMessage =
+        err.response?.data?.error?.message || '키워드 삭제 중 오류가 발생했습니다.';
+      triggerToast(errorMessage);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -99,20 +150,29 @@ const KeywordSettingsPage: React.FC = () => {
         </div>
 
         {/* Keyword List */}
-        <div className="flex flex-col gap-3">
-          {keywords.map((keyword, index) => (
-            <div key={index} className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
-              <span className="text-base font-bold text-gray-800">{keyword}</span>
-              <button
-                onClick={() => handleRemoveKeyword(index)}
-                className="text-gray-400 hover:text-gray-600 border border-gray-300 rounded md:rounded-sm p-0.5"
-                aria-label="Remove keyword"
+        {isLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <span className="text-gray-400 text-sm">키워드를 불러오는 중...</span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {keywords.map((keyword) => (
+              <div
+                key={keyword.id}
+                className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 shadow-sm"
               >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-        </div>
+                <span className="text-base font-bold text-gray-800">{keyword.name}</span>
+                <button
+                  onClick={() => handleRemoveKeyword(keyword.id)}
+                  className="text-gray-400 hover:text-gray-600 border border-gray-300 rounded md:rounded-sm p-0.5"
+                  aria-label="Remove keyword"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

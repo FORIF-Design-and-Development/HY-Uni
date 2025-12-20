@@ -25,12 +25,19 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
  * 필수 인증 미들웨어
  * 토큰이 없거나 유효하지 않으면 401 에러 반환
  * 인증 성공 시 req.userId에 사용자 ID 설정
+ * 
+ * TODO: 개발용 임시 하드코딩 - user_id = 14
  */
 export function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction,
 ): void {
+  // TODO: 개발용 임시 하드코딩 - 프로덕션 배포 전 제거 필요
+  (req as any).userId = 14;
+  next();
+  return;
+
   // 쿠키 또는 Authorization 헤더에서 토큰 추출
   const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
 
