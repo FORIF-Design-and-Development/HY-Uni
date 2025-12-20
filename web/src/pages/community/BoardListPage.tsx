@@ -9,7 +9,7 @@ const BoardListPage: React.FC = () => {
   const [boards, setBoards] = useState<Board[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load boards on component mount
+  // 게시판 목록 조회
   useEffect(() => {
     const loadBoards = async () => {
       try {
@@ -28,7 +28,7 @@ const BoardListPage: React.FC = () => {
     loadBoards();
   }, []);
 
-  // Helper function to get route type from board name
+  // 게시판 이름으로 게시판 타입 조회
   const getRouteType = (boardName: string): string => {
     if (boardName.includes('나의')) return 'my';
     if (boardName.includes('추천')) return 'recommended';
@@ -79,7 +79,7 @@ const BoardListPage: React.FC = () => {
   return (
     <div className="bg-white min-h-screen font-sans">
       <div className="px-5 py-6">
-        {/* Header with Title and Home Button */}
+        {/* 상단헤더 */}
         <div className="flex justify-between items-center mb-6 animate-fade-in-up">
             <h1 className="text-xl font-bold text-gray-900">커뮤니티</h1>
             <button 
@@ -91,13 +91,13 @@ const BoardListPage: React.FC = () => {
             </button>
         </div>
 
-        {/* Search Bar */}
+        {/* 검색 바 */}
         <div className="flex gap-2 mb-2 animate-fade-in-up delay-75">
           <div className="flex-1 relative" onClick={() => navigate('/community/search')}>
             <input
               type="text"
               value={searchTerm}
-              readOnly // Prevent typing here, force navigation to search page
+              readOnly // 입력 금지, 검색 페이지로 이동
               placeholder="검색어를 입력해주세요."
               className="w-full h-10 px-3 border border-gray-200 rounded-md text-sm outline-none focus:border-gray-400 placeholder-gray-400 cursor-pointer bg-white transition-colors"
             />
@@ -111,7 +111,7 @@ const BoardListPage: React.FC = () => {
         </div>
         <p className="text-xs text-gray-400 mb-8 animate-fade-in-up delay-100">검색창에서 인기 검색어를 확인하세요</p>
 
-        {/* Board List */}
+        {/* 게시판 목록 */}
         {isLoading ? (
           <div className="flex justify-center items-center py-8">
             <span className="text-gray-400 text-sm">게시판 목록을 불러오는 중...</span>
