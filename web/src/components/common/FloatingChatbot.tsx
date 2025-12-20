@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { askChatbot, ChatbotResponse } from "../../api/campus/chatbot.api";
-import { X, MessageCircle } from "lucide-react";
+import { X, MessageCircle, LayoutDashboard, Bot, Plus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Message = {
   id: number;
@@ -11,16 +12,37 @@ type Message = {
 
 export const FloatingChatbot: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // 페이지 이동 시 챗봇 닫기
   useEffect(() => {
     setIsOpen(false);
+    setIsMenuOpen(false);
   }, [location.pathname]);
+
+  // 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,25 +81,127 @@ export const FloatingChatbot: React.FC = () => {
     }
   };
 
+  // 메뉴 항목 정의
+  const menuItems = [
+    {
+      id: 'chatbot',
+      label: '챗봇',
+      icon: Bot,
+      path: '/chatbot',
+      onClick: () => {
+        setIsOpen(true);
+        setIsMenuOpen(false);
+      },
+    },
+    {
+      id: 'community',
+      label: '커뮤니티',
+      icon: MessageCircle,
+      path: '/community',
+      onClick: () => {
+        navigate('/community');
+        setIsMenuOpen(false);
+      },
+    },
+    {
+      id: 'dashboard',
+      label: '대시보드',
+      icon: LayoutDashboard,
+      path: '/dashboard',
+      onClick: () => {
+        navigate('/dashboard');
+        setIsMenuOpen(false);
+      },
+    },
+  ];
+
   return (
     <>
-      {/* 플로팅 버튼 */}
+      {/* Speed Dial 메뉴 */}
+      <AnimatePresence>
+        {isMenuOpen && !isOpen && (
+          <motion.div
+            ref={menuRef}
+            className="fixed bottom-20 right-5 z-50 flex flex-col-reverse gap-3 items-end"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {menuItems.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <motion.button
+                  key={item.id}
+                  onClick={item.onClick}
+                  className="flex items-center gap-2 bg-white text-gray-700 px-4 py-3 rounded-full shadow-lg hover:shadow-xl transition-shadow font-semibold text-sm border border-gray-100"
+                  initial={{ 
+                    opacity: 0, 
+                    y: 20,
+                    scale: 0.8 
+                  }}
+                  animate={{ 
+                    opacity: 1, 
+                    y: 0,
+                    scale: 1 
+                  }}
+                  exit={{ 
+                    opacity: 0, 
+                    y: 20,
+                    scale: 0.8 
+                  }}
+                  transition={{ 
+                    delay: index * 0.05,
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 25
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 메인 플로팅 버튼 */}
       {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-[#016ABF] text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center"
-          style={{
-            animation: "float 3s ease-in-out infinite",
+        <motion.button
+          onClick={() => {
+            if (isMenuOpen) {
+              setIsMenuOpen(false);
+            } else {
+              setIsMenuOpen(true);
+            }
           }}
-          aria-label="챗봇 열기"
+          className={`fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-[#016ABF] text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center ${
+            !isMenuOpen ? 'animate-bounce-gentle' : ''
+          }`}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          animate={{
+            rotate: isMenuOpen ? 45 : 0,
+          }}
+          transition={{ 
+            rotate: { duration: 0.2 }
+          }}
+          aria-label={isMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
         >
-          <MessageCircle className="w-6 h-6" strokeWidth={2.5} />
-        </button>
+          {isMenuOpen ? (
+            <X className="w-6 h-6" strokeWidth={2.5} />
+          ) : (
+            <Plus className="w-6 h-6" strokeWidth={2.5} />
+          )}
+        </motion.button>
       )}
 
       {/* 챗봇 창 */}
       {isOpen && (
-        <div className="fixed bottom-5 right-5 left-5 z-50 max-w-md mx-auto h-[500px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-slide-up">
+        <div className="fixed bottom-5 right-20 z-50 w-80 h-[400px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-slide-up">
           {/* 헤더 */}
           <div className="bg-[#016ABF] text-white px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -162,15 +286,6 @@ export const FloatingChatbot: React.FC = () => {
       )}
 
       <style>{`
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-10px);
-          }
-        }
-        
         @keyframes slide-up {
           from {
             opacity: 0;

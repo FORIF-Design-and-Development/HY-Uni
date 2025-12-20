@@ -5,6 +5,7 @@ import { KeywordItem, PostItem, FavoriteItem } from '../../types';
 import { motion } from 'framer-motion';
 import { getHomeData, type HomeDataResponse } from '../../api/community/home.api';
 import { toKST } from '../../utils/date';
+import { BrandName } from '../../components/common/BrandName';
 
 const CommunityHomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -194,7 +195,7 @@ const CommunityHomePage: React.FC = () => {
     <div className="bg-white min-h-screen pb-10 font-sans">
       {/* 상단 헤더 */}
       <header className="flex justify-between items-center px-5 py-4 bg-white sticky top-0 z-50 animate-fade-in-up">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">커뮤니티</h1>
+        <BrandName suffix="커뮤니티" size="lg" />
         <div className="flex gap-4 text-gray-700">
           {/* 알림 뱃지 없는 버전 - 새로운 알림 없을 때때 */}
           <Link to="/community/board-list" className="p-1 hover:text-gray-900 transition-colors btn-press">

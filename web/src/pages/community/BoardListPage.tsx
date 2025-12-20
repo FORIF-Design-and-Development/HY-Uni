@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Star, Bell, Home } from 'lucide-react';
 import { getBoards, toggleBoardFavorite, toggleBoardSubscription, Board } from '../../api/community/board.api';
+import { BrandName } from '../../components/common/BrandName';
 
 const BoardListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -81,7 +82,7 @@ const BoardListPage: React.FC = () => {
       <div className="px-5 py-6">
         {/* 상단헤더 */}
         <div className="flex justify-between items-center mb-6 animate-fade-in-up">
-            <h1 className="text-xl font-bold text-gray-900">커뮤니티</h1>
+            <BrandName suffix="커뮤니티" size="md" />
             <button 
                 onClick={() => navigate('/community')}
                 className="p-1 -mr-1 text-gray-900 rounded-full hover:bg-gray-100 transition-colors btn-press"
