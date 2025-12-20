@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { askChatbot, ChatbotResponse } from "../../api/campus/chatbot.api";
 import { X, MessageCircle } from "lucide-react";
 
@@ -9,11 +10,17 @@ type Message = {
 };
 
 export const FloatingChatbot: React.FC = () => {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 페이지 이동 시 챗봇 닫기
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

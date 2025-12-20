@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { HylionWidget } from "../components/campus/HylionWidget";
 import { LibrarySeatsWidget } from "../components/campus/LibrarySeatsWidget";
 import NoticeCard from "../components/campus/NoticeCard";
-import { FloatingChatbot } from "../components/common/FloatingChatbot";
 import { useNoticeStore } from "../store/useNoticeStore";
 import { useTimetableStore } from "../store/timetable.store";
 
@@ -331,9 +330,6 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
-
-      {/* 플로팅 챗봇 */}
-      <FloatingChatbot />
     </div>
   );
 }
