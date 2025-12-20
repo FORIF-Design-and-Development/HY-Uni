@@ -171,23 +171,56 @@ export default function PlaceListPage() {
         ) : (
           filteredPlaces.map((place) => {
             const catInfo = CATEGORY_MAP[place.category] || CATEGORY_MAP.ETC;
+
+            // 1. 이미지 우선순위 로직
+            // DB에 저장된 구체적인 이미지가 있으면 그걸 쓰고, 없으면 카테고리 기본 이미지 사용
+            const displayImage = place.image_url
+              ? place.image_url
+              : PLACEHOLDER_IMGS[place.category] || PLACEHOLDER_IMGS.ETC;
+            console.log(displayImage);
             return (
-              <Link
-                to={`/places/${place.placeId}`}
+              /* 2. Link 대신 a 태그 사용 (새 탭에서 카카오맵 열기) */
+              <a
+                href={
+                  place.kakaoPlaceUrl || "#"
+                } /* 카카오 URL이 없으면 # 처리 */
+                target="_blank" /* 새 탭에서 열기 */
+                rel="noopener noreferrer" /* 보안 및 성능 최적화 */
                 key={place.placeId}
                 className="place-card"
+                style={{
+                  textDecoration: "none",
+                  color: "inherit",
+                  display: "block" /* 레이아웃 안정성 추가 */,
+                }} /* a태그 밑줄 제거 */
               >
-                <div
+                {/* [수정됨] div(backgroundImage) -> img 태그로 변경 
+      - referrerPolicy="no-referrer"를 적용하여 외부 이미지 차단 회피
+      - objectFit: "cover"를 사용하여 기존 background-size: cover 효과 유지
+    */}
+                <img
+                  src={displayImage}
+                  alt={place.name}
+                  referrerPolicy="no-referrer"
                   className="place-img"
                   style={{
-                    backgroundImage: `url(${PLACEHOLDER_IMGS[place.category]})`,
+                    width: "100%", // 가로 꽉 채우기
+                    height: "180px", // 💡 팁: 기존 CSS의 높이와 맞춰주세요 (예: 180px, 200px 등)
+                    objectFit: "cover", // 이미지가 찌그러지지 않고 영역에 꽉 차게 함
+                    display: "block", // 이미지 하단 공백 제거
+                    borderTopLeftRadius: "calc(0.25rem - 1px)", // (선택) 부트스트랩/기본 카드 스타일 모서리
+                    borderTopRightRadius: "calc(0.25rem - 1px)", // (선택)
                   }}
                 />
+
                 <div className="place-info">
                   <div className="place-meta">
                     <span className="place-category">{catInfo.label}</span>
                     <span className="place-rating">
-                      ⭐ {place.averageRating.toFixed(1)}
+                      ⭐{" "}
+                      {place.averageRating
+                        ? place.averageRating.toFixed(1)
+                        : "0.0"}
                     </span>
                   </div>
                   <h3 className="place-name">{place.name}</h3>
@@ -195,10 +228,10 @@ export default function PlaceListPage() {
                     📍 {place.roadAddress || place.address}
                   </p>
                   <p className="place-review-count">
-                    리뷰 {place.reviewCount}개
+                    리뷰 {place.reviewCount || 0}개
                   </p>
                 </div>
-              </Link>
+              </a>
             );
           })
         )}

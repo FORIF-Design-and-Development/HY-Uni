@@ -28,6 +28,7 @@ export interface Place {
   averageRating: number;
   reviewCount: number;
   createdAt: Date;
+  image_url: string;
 }
 
 // 장소 생성을 위한 DTO
@@ -63,6 +64,7 @@ interface PlaceRow extends RowDataPacket {
   average_rating: string;
   review_count: number;
   created_at: string; // Date or string depending on driver config
+  image_url: string;
 }
 
 /**
@@ -83,6 +85,7 @@ const mapRowToPlace = (row: PlaceRow): Place => {
     averageRating: parseFloat(row.average_rating),
     reviewCount: row.review_count,
     createdAt: new Date(row.created_at),
+    image_url: row.image_url,
   };
 };
 
