@@ -83,11 +83,14 @@ export const useHylionStore = create<HylionState>((set, get) => ({
     }
   },
 
-  // 미션 진행도 조회
+    // 미션 진행도 조회
   fetchMissionProgress: async (token: string) => {
     set({ isLoading: true, error: null });
     try {
       const data = await fetchMissionProgress(token);
+
+      // ✅ [추가] API에서 MissionProgressResponse[]로 정규화해서 내려주므로
+      // store에서는 그대로 저장한다.
       set({ missionProgress: data, isLoading: false });
     } catch (err) {
       const error = err as Error;
@@ -97,6 +100,7 @@ export const useHylionStore = create<HylionState>((set, get) => ({
       });
     }
   },
+
 
   // 현재 아이콘 변경
   changeIcon: async (token: string, iconId: number) => {

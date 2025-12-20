@@ -31,8 +31,9 @@ export const MissionCard = ({ mission }: MissionCardProps) => {
               src={`http://localhost:3000${
                 mission.isCompleted
                   ? mission.rewardIcon.iconImageUrl
-                  : mission.rewardIcon.iconLockedImageUrl
+                  : (mission.rewardIcon.iconLockedImageUrl || mission.rewardIcon.iconImageUrl) // ✅ [추가] 잠금 이미지 없으면 일반 이미지로 대체
               }`}
+
               alt={mission.rewardIcon.iconName}
               className={`w-16 h-16 object-contain ${
                 !mission.isCompleted && 'filter grayscale'
