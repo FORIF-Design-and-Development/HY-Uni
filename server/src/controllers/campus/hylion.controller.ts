@@ -364,43 +364,53 @@ export class HylionController {
       const completed: any[] = [];
 
       for (const mission of missions) {
-        if (!mission.current_count && mission.current_count !== 0) {
-          continue; // 시작하지 않은 미션은 제외
-        }
+  // ✅ [수정] 시작하지 않은 미션도 목록에 포함해야 프론트에서 "미시작"으로 표시 가능
+  // 기존 로직은 current_count가 NULL인 미션을 전부 제외해서 목록이 비어버림
+  const currentCount = mission.current_count ?? 0;
 
-        let rewardIcon = null;
-        if (mission.reward_type === 'fixed_icon' && mission.reward_icon_id) {
-          const icon = await hylionModel.getIconById(mission.reward_icon_id);
-          if (icon) {
-            rewardIcon = {
-              iconId: icon.icon_id,
-              iconName: icon.icon_name,
-              iconImageUrl: icon.icon_image_url,
-            };
-          }
-        }
+  let rewardIcon = null;
+  if (mission.reward_type === 'fixed_icon' && mission.reward_icon_id) {
+    const icon = await hylionModel.getIconById(mission.reward_icon_id);
+    if (icon) {
+      rewardIcon = {
+        iconId: icon.icon_id,
+        iconName: icon.icon_name,
+        iconImageUrl: icon.icon_image_url,
+        // ✅ [추가] MissionCard에서 미완료 시 잠금 이미지를 쓰므로 같이 내려줌
+        iconLockedImageUrl: icon.icon_locked_image_url,
+      };
+    }
+  }
 
-        const missionData = {
-          missionId: mission.mission_id,
-          missionName: mission.mission_name,
-          missionCategory: mission.mission_category,
-          rewardIcon,
-        };
+  // ✅ [추가] 프론트 MissionCard가 요구하는 필드를 포함해 내려줌
+  const missionData = {
+    missionId: mission.mission_id,
+    missionName: mission.mission_name,
+    // ✅ [추가] 프론트에서 설명을 표시하므로 mission_description 내려줌
+    missionDescription: mission.mission_description || '',
+    missionCategory: mission.mission_category,
+    rewardIcon,
+    // ✅ [추가] 프론트는 targetCount/currentCount/progressRate 기반으로 렌더링
+    targetCount: mission.required_count,
+    currentCount,
+    progressRate: mission.progress_percentage || 0,
+  };
 
-        if (mission.is_completed) {
-          completed.push({
-            ...missionData,
-            completedAt: mission.completed_at,
-          });
-        } else {
-          inProgress.push({
-            ...missionData,
-            currentCount: mission.current_count,
-            requiredCount: mission.required_count,
-            progressPercentage: mission.progress_percentage,
-          });
-        }
-      }
+  if (mission.is_completed) {
+    completed.push({
+      ...missionData,
+      isCompleted: true,
+      completedAt: mission.completed_at,
+    });
+  } else {
+    inProgress.push({
+      ...missionData,
+      isCompleted: false,
+      completedAt: null,
+    });
+  }
+}
+
 
       return res.json({
         data: {

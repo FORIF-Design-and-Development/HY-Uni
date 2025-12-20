@@ -213,7 +213,8 @@ export const changeCurrentIcon = async (
  */
 export const fetchMissions = async (token: string): Promise<Mission[]> => {
   try {
-    const response = await axios.get<ApiResponse<Mission[]>>(
+    // ✅ 백엔드 응답은 data: { missions: [...] } 형태임 (배열이 아님)
+    const response = await axios.get<ApiResponse<{ missions: Mission[] }>>(
       `${API_BASE_URL}/hylion/missions`,
       {
         headers: {
@@ -226,7 +227,7 @@ export const fetchMissions = async (token: string): Promise<Mission[]> => {
       throw new Error(response.data.error.message);
     }
 
-    return response.data.data;
+    return response.data.data.missions;
   } catch (error) {
     console.error('[API] 미션 목록 조회 실패:', error);
     throw error;
@@ -236,31 +237,65 @@ export const fetchMissions = async (token: string): Promise<Mission[]> => {
 /**
  * 사용자 미션 진행도 조회
  * @param token - 인증 토큰
- * @returns 사용자의 미션 진행도 목록
+ * @returns 사용자의 미션 진행도 (MissionCard에서 사용하는 형태로 정규화)
  */
-export const fetchMissionProgress = async (
-  token: string
-): Promise<MissionProgressResponse[]> => {
-  try {
-    const response = await axios.get<ApiResponse<MissionProgressResponse[]>>(
-      `${API_BASE_URL}/hylion/missions/progress`,
-      {
+  export const fetchMissionProgress = async (
+    token: string
+  ): Promise<MissionProgressResponse[]> => {
+    try {
+      const response = await axios.get<
+        ApiResponse<{ inProgress: any[]; completed: any[] }>
+      >(`${API_BASE_URL}/hylion/missions/progress`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+      });
+
+      if (response.data.error) {
+        throw new Error(response.data.error.message);
       }
-    );
 
-    if (response.data.error) {
-      throw new Error(response.data.error.message);
+      const { inProgress = [], completed = [] } = response.data.data ?? {};
+
+      const mappedInProgress: MissionProgressResponse[] = (inProgress as any[]).map((m) => ({
+        missionId: m.missionId,
+        missionName: m.missionName,
+        missionDescription: '',
+        targetCount: m.requiredCount ?? m.targetCount ?? 0,
+        currentCount: m.currentCount ?? 0,
+        isCompleted: false,
+        completedAt: null,
+        rewardIcon: m.rewardIcon ?? null,
+        progressRate: m.progressPercentage ?? m.progressRate ?? 0,
+      }));
+
+
+      const mappedCompleted: MissionProgressResponse[] = (completed as any[]).map((m) => {
+      const targetCount = m.requiredCount ?? m.targetCount ?? 0;
+
+      return {
+        missionId: m.missionId,
+        missionName: m.missionName,
+        missionDescription: '',
+        targetCount,
+        currentCount: targetCount,
+        isCompleted: true,
+        completedAt: m.completedAt ?? null,
+        rewardIcon: m.rewardIcon ?? null,
+        progressRate: 100,
+      };
+    });
+
+
+      return [...mappedInProgress, ...mappedCompleted];
+    } catch (error) {
+      console.error('[API] 미션 진행도 조회 실패:', error);
+      throw error;
     }
+  };
 
-    return response.data.data;
-  } catch (error) {
-    console.error('[API] 미션 진행도 조회 실패:', error);
-    throw error;
-  }
-};
+
+
 
 /**
  * 전체 아이콘 목록 조회 (인증 불필요)
