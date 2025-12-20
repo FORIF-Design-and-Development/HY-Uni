@@ -188,6 +188,8 @@ const PostDetailPage: React.FC = () => {
   const commentEditRequestIdRef = useRef<Map<number, number>>(new Map());
   const commentDeleteRequestIdRef = useRef(0);
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleBack = () => {
       if (boardType === 'international') {
           navigate('/community/board/international');
@@ -803,11 +805,26 @@ const PostDetailPage: React.FC = () => {
       if (!id) return;
       
       try {
+        setIsDeleting(true);
         await deletePost(Number(id));
-        navigate('/community/board/my');
-      } catch (err) {
-        console.error('Failed to delete post:', err);
         setShowDeleteModal(false);
+        // 삭제 성공 시 이전 페이지로 이동
+        if (boardType === 'international') {
+          navigate('/community/board/international');
+        } else if (boardType === 'my') {
+          navigate('/community/board/my');
+        } else if (boardType) {
+          navigate(`/community/board/${boardType}`);
+        } else {
+          navigate('/community/board/my');
+        }
+      } catch (err: any) {
+        console.error('Failed to delete post:', err);
+        const errorMessage = err.response?.data?.error?.message || '게시글 삭제 중 오류가 발생했습니다.';
+        alert(errorMessage);
+        setShowDeleteModal(false);
+      } finally {
+        setIsDeleting(false);
       }
   };
 
@@ -1449,16 +1466,25 @@ const PostDetailPage: React.FC = () => {
                   <div className="flex border-t border-gray-400/30">
                       <button 
                           onClick={() => setShowDeleteModal(false)}
-                          className="flex-1 py-3 text-base font-medium text-gray-600 hover:bg-gray-400/10 active:bg-gray-400/20"
+                          disabled={isDeleting}
+                          className="flex-1 py-3 text-base font-medium text-gray-600 hover:bg-gray-400/10 active:bg-gray-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                           취소
                       </button>
                       <div className="w-[1px] bg-gray-400/30" />
                       <button 
                           onClick={handleDeletePost}
-                          className="flex-1 py-3 text-base font-medium text-gray-600 hover:bg-gray-400/10 active:bg-gray-400/20"
+                          disabled={isDeleting}
+                          className="flex-1 py-3 text-base font-medium text-gray-600 hover:bg-gray-400/10 active:bg-gray-400/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
-                          삭제
+                          {isDeleting ? (
+                              <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  삭제 중...
+                              </>
+                          ) : (
+                              '삭제'
+                          )}
                       </button>
                   </div>
               </div>

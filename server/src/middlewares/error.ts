@@ -17,7 +17,12 @@ export function notFound(_req: Request, _res: Response, next: NextFunction) {
 // 전역 에러 핸들러
 export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction) {
   const status = typeof err?.status === 'number' ? err.status : 500;
-  console.error(err);
+  
+  // 404 에러는 로그를 출력하지 않음 (정적 파일 요청 등 정상적인 경우)
+  if (status !== 404) {
+    console.error(err);
+  }
+  
   res.status(status).json({ message: err.message ?? 'Internal Server Error' });
 }
 

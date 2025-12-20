@@ -2137,24 +2137,36 @@ export interface RecommendedPost {
     name: string;
   };
   createdAt: string;
+  recommendationReason?: {
+    matchedKeywords: string[];
+    matchedTags: string[];
+  };
 }
 
 // BoardPostListItem[]를 RecommendedPost[]로 변환하는 헬퍼 함수
 export function convertBoardPostListToRecommendedPosts(
   posts: BoardPostListItem[],
 ): RecommendedPost[] {
-  return posts.map((post) => ({ // posts 배열을 순회하며 각 요소를 추출하여 새로운 배열로 반환
-    id: post.id,
-    title: post.title,
-    contentPreview: extractContentPreview(post.content),
-    likesCount: post.counts.likes,
-    commentCount: post.counts.comments,
-    originalBoard: {
-      id: post.board.id,
-      name: post.board.name,
-    },
-    createdAt: post.createdAt,
-  }));
+  return posts.map((post) => {
+    const result: RecommendedPost = {
+      id: post.id,
+      title: post.title,
+      contentPreview: extractContentPreview(post.content),
+      likesCount: post.counts.likes,
+      commentCount: post.counts.comments,
+      originalBoard: {
+        id: post.board.id,
+        name: post.board.name,
+      },
+      createdAt: post.createdAt,
+    };
+    
+    if (post.recommendationReason) {
+      result.recommendationReason = post.recommendationReason;
+    }
+    
+    return result;
+  });
 }
 
 // 사용자 선호 키워드/태그 기반 추천 게시글 조회 (findPostsByBoardId 재사용)
