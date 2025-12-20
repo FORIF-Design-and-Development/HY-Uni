@@ -10,6 +10,8 @@ import {
   markNotificationAsRead
 } from '../../api/community/notification.api';
 import { getHomeData } from '../../api/community/home.api';
+import { getBoardPosts, BoardPostListItem } from '../../api/community/post.api';
+import { searchPosts, SearchResult } from '../../api/community/search.api';
 import { toKST, getNowKST } from '../../utils/date';
 import { CheckCheck } from 'lucide-react';
 
@@ -88,20 +90,23 @@ const NotificationsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [favoriteBoardIds, setFavoriteBoardIds] = useState<number[]>([]);
+  const [preferredKeywords, setPreferredKeywords] = useState<string[]>([]);
   const eventSourceRef = React.useRef<EventSource | null>(null);
 
-  // 즐겨찾기 게시판 ID 조회
+  // 즐겨찾기 게시판 ID 및 선호 키워드 조회
   useEffect(() => {
-    const loadFavoriteBoards = async () => {
+    const loadUserPreferences = async () => {
       try {
         const homeData = await getHomeData();
         const ids = homeData.favoriteBoards.map(board => board.id);
         setFavoriteBoardIds(ids);
+        const keywords = homeData.userPreferences.keywords.map(k => k.name);
+        setPreferredKeywords(keywords);
       } catch (err) {
-        console.error('즐겨찾기 게시판 조회 실패:', err);
+        console.error('사용자 설정 조회 실패:', err);
       }
     };
-    loadFavoriteBoards();
+    loadUserPreferences();
   }, []);
 
   // 단일 알림 처리 함수 (SSE 및 목록 조회 공용)
@@ -172,38 +177,183 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
+  // 게시글을 NotificationItem으로 변환하는 함수
+  const convertPostToNotificationItem = (post: BoardPostListItem): NotificationItem => {
+    return {
+      id: post.id,
+      category: post.board.name,
+      title: post.title,
+      content: post.contentSnippet || (post.content.length > 50 ? post.content.substring(0, 50) + '...' : post.content),
+      date: formatDate(post.createdAt),
+      postId: post.id,
+      isRead: false, // 일반 탭에서는 항상 읽지 않은 상태
+      rawType: 'new_post_in_board' as NotificationType,
+    };
+  };
+
+  // 검색 결과를 NotificationItem으로 변환하는 함수
+  const convertSearchResultToNotificationItem = (result: SearchResult): NotificationItem => {
+    return {
+      id: result.id,
+      category: result.board?.name || '',
+      title: result.title,
+      content: result.contentSnippet || '',
+      date: formatDate(result.createdAt),
+      postId: result.id,
+      isRead: false, // 키워드 탭에서는 항상 읽지 않은 상태
+      rawType: 'new_post_in_board' as NotificationType,
+    };
+  };
+
   // 알림 목록 조회
   useEffect(() => {
-    const loadNotifications = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // 모든 알림 조회 (백엔드에서 JOIN된 데이터가 옴)
-        const response = await getNotifications(50, 0); // limit 50
+        // 일반 탭: 즐겨찾기 게시판의 모든 게시글 조회
+        if (activeTab === 'general') {
+          if (favoriteBoardIds.length === 0) {
+            setNotifications([]);
+            setLoading(false);
+            return;
+          }
 
-        // 즉시 매핑 처리 (비동기 호출 없음)
-        const validNotifications = response.notifications
-          .map(processNotification)
-          .filter((item): item is NotificationItem => item !== null);
+          // 모든 즐겨찾기 게시판에서 게시글 목록을 병렬로 조회
+          const postPromises = favoriteBoardIds.map(boardId =>
+            getBoardPosts({
+              boardId,
+              page: 1,
+              pageSize: 50,
+              sortBy: 'latest'
+            }).catch(err => {
+              console.error(`게시판 ${boardId} 게시글 조회 실패:`, err);
+              return null; // 일부 게시판 실패 시에도 다른 게시판 데이터는 표시
+            })
+          );
 
-        setNotifications(validNotifications);
+          const postResponses = await Promise.all(postPromises);
+          
+          // 모든 게시글을 하나의 배열로 병합
+          const allPosts: BoardPostListItem[] = [];
+          postResponses.forEach(response => {
+            if (response && response.posts) {
+              allPosts.push(...response.posts);
+            }
+          });
+
+          // createdAt 기준 최신순 정렬
+          allPosts.sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+
+          // NotificationItem 형태로 변환 (읽음 상태 반영)
+          const notificationItems = allPosts.map(convertPostToNotificationItem);
+          setNotifications(notificationItems);
+        }
+        // My 탭: 알림 조회
+        else if (activeTab === 'my') {
+          // 모든 알림 조회 (백엔드에서 JOIN된 데이터가 옴)
+          const response = await getNotifications(50, 0); // limit 50
+
+          // My 탭: 댓글, 답글, 반응 관련 알림만 필터링
+          const filteredNotifications = response.notifications.filter(
+            (n) =>
+              n.type === 'new_comment_on_post' ||
+              n.type === 'new_reply_on_comment' ||
+              n.type === 'new_reaction_on_post' ||
+              n.type === 'new_reaction_on_comment'
+          );
+
+          // 최신순 정렬 보장 (createdAt 기준 내림차순)
+          filteredNotifications.sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+
+          // 매핑 처리
+          const validNotifications = filteredNotifications
+            .map(processNotification)
+            .filter((item): item is NotificationItem => item !== null);
+
+          setNotifications(validNotifications);
+        }
+        // 키워드 탭: 선호 키워드로 게시글 검색
+        else if (activeTab === 'keyword') {
+          if (preferredKeywords.length === 0) {
+            setNotifications([]);
+            setLoading(false);
+            return;
+          }
+
+          // 각 선호 키워드별로 게시글 검색 (병렬 처리)
+          const searchPromises = preferredKeywords.map(keyword =>
+            searchPosts(keyword, 1, 50, 'relevance').catch(err => {
+              console.error(`키워드 "${keyword}" 검색 실패:`, err);
+              return null; // 일부 키워드 검색 실패 시에도 다른 키워드 결과는 표시
+            })
+          );
+
+          const searchResponses = await Promise.all(searchPromises);
+
+          // 모든 검색 결과를 하나의 배열로 병합
+          const allSearchResults: SearchResult[] = [];
+          searchResponses.forEach(response => {
+            if (response && response.results) {
+              allSearchResults.push(...response.results);
+            }
+          });
+
+          // 게시글 ID 기준으로 중복 제거
+          const uniqueResults = Array.from(
+            new Map(allSearchResults.map(result => [result.id, result])).values()
+          );
+
+          // createdAt 기준 최신순 정렬
+          uniqueResults.sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+
+          // NotificationItem 형태로 변환
+          const notificationItems = uniqueResults.map(convertSearchResultToNotificationItem);
+          setNotifications(notificationItems);
+        }
       } catch (err: any) {
-        console.error('알림 목록 조회 실패:', err);
-        setError(err.response?.data?.error?.message || '알림을 불러오는데 실패했습니다.');
+        console.error('데이터 조회 실패:', err);
+        setError(err.response?.data?.error?.message || '데이터를 불러오는데 실패했습니다.');
         setNotifications([]);
       } finally {
         setLoading(false);
       }
     };
 
-    if (favoriteBoardIds.length > 0 || activeTab === 'my') {
-      loadNotifications();
+    // 일반 탭: 즐겨찾기 게시판 ID가 로드된 후에만 조회
+    // My 탭: 즉시 조회 가능
+    // 키워드 탭: 선호 키워드가 로드된 후에만 조회
+    if (activeTab === 'general') {
+      if (favoriteBoardIds.length > 0) {
+        loadData();
+      }
+    } else if (activeTab === 'my') {
+      loadData();
+    } else if (activeTab === 'keyword') {
+      if (preferredKeywords.length > 0) {
+        loadData();
+      }
     }
-  }, [activeTab, favoriteBoardIds]);
+  }, [activeTab, favoriteBoardIds, preferredKeywords]);
 
-  // SSE 실시간 알림 연결
+  // SSE 실시간 알림 연결 (My 탭에서만 사용)
   useEffect(() => {
+    // 일반 탭과 키워드 탭에서는 SSE 연결 비활성화
+    if (activeTab === 'general' || activeTab === 'keyword') {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      return;
+    }
+
     // 기존 연결 종료
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -217,9 +367,24 @@ const NotificationsPage: React.FC = () => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'notification' && data.notification) {
+          const notification = data.notification as Notification;
+          
+          // My 탭: 댓글, 답글, 반응 관련 알림만 처리
+          if (activeTab === 'my') {
+            if (
+              notification.type !== 'new_comment_on_post' &&
+              notification.type !== 'new_reply_on_comment' &&
+              notification.type !== 'new_reaction_on_post' &&
+              notification.type !== 'new_reaction_on_comment'
+            ) {
+              return;
+            }
+          }
+          
           // 동기적으로 처리 가능
-          const newItem = processNotification(data.notification);
+          const newItem = processNotification(notification);
           if (newItem) {
+            // 최신순 유지 (맨 앞에 추가)
             setNotifications(prev => [newItem, ...prev]);
           }
         }
@@ -236,11 +401,21 @@ const NotificationsPage: React.FC = () => {
   const handleNotificationClick = async (notificationId: number, postId?: number) => {
     if (!postId) return;
 
-    try {
-      // 읽음 처리 (에러가 나도 이동은 함)
-      await markNotificationAsRead(notificationId);
-    } catch (err) {
-      console.error('알림 읽음 처리 실패:', err);
+    // 일반 탭과 키워드 탭에서는 읽음 처리하지 않음
+    if (activeTab === 'my') {
+      // My 탭: 서버에 읽음 처리
+      try {
+        // 읽음 처리 (에러가 나도 이동은 함)
+        await markNotificationAsRead(notificationId);
+        // 해당 항목의 isRead 상태 업데이트
+        setNotifications(prev => 
+          prev.map(item => 
+            item.id === notificationId ? { ...item, isRead: true } : item
+          )
+        );
+      } catch (err) {
+        console.error('알림 읽음 처리 실패:', err);
+      }
     }
 
     navigate(`/community/post/${postId}`);
@@ -285,26 +460,50 @@ const NotificationsPage: React.FC = () => {
 
     return (
       <div className="divide-y divide-gray-100">
-        {notifications.map((item, idx) => (
-          <div
-            key={item.id}
-            className={`p-4 transition-colors animate-fade-in-up cursor-pointer ${item.isRead ? 'bg-white hover:bg-gray-50' : 'bg-blue-50/50 hover:bg-blue-50'
+        {notifications.map((item, idx) => {
+          // 일반 탭과 키워드 탭에서는 항상 읽은 상태 스타일 적용
+          const isReadStyle = (activeTab === 'general' || activeTab === 'keyword') ? true : item.isRead;
+          
+          return (
+            <div
+              key={item.id}
+              className={`p-4 transition-colors animate-fade-in-up cursor-pointer relative ${
+                isReadStyle 
+                  ? 'bg-gray-50 hover:bg-gray-100 border-l-4 border-transparent' 
+                  : 'bg-blue-100 hover:bg-blue-200 border-l-4 border-blue-500'
               }`}
-            style={{ animationDelay: `${idx * 50}ms` }}
-            onClick={() => handleNotificationClick(item.id, item.postId)}
-          >
-            {item.category && (
-              <div className="text-xs text-gray-500 mb-1 font-medium">{item.category}</div>
-            )}
-            <h3 className="text-base font-bold text-gray-900 mb-1 leading-tight">{item.title}</h3>
-            {item.content && (
-              <p className="text-sm text-gray-500 line-clamp-2 mb-1.5 whitespace-pre-wrap leading-relaxed">
-                {item.content}
-              </p>
-            )}
-            <div className="text-xs text-gray-400">{item.date}</div>
-          </div>
-        ))}
+              style={{ animationDelay: `${idx * 50}ms` }}
+              onClick={() => handleNotificationClick(item.id, item.postId)}
+            >
+              {item.category && (
+                <div className={`text-xs mb-1 font-medium ${
+                  isReadStyle ? 'text-gray-500' : 'text-blue-700'
+                }`}>
+                  {item.category}
+                </div>
+              )}
+              <h3 className={`text-base mb-1 leading-tight ${
+                isReadStyle 
+                  ? 'font-semibold text-gray-700' 
+                  : 'font-bold text-gray-900'
+              }`}>
+                {item.title}
+              </h3>
+              {item.content && (
+                <p className={`text-sm line-clamp-2 mb-1.5 whitespace-pre-wrap leading-relaxed ${
+                  isReadStyle ? 'text-gray-500' : 'text-gray-600'
+                }`}>
+                  {item.content}
+                </p>
+              )}
+              <div className={`text-xs ${
+                isReadStyle ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                {item.date}
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
