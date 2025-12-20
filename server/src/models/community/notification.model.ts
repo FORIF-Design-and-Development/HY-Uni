@@ -13,6 +13,7 @@ export type NotificationType =
   | 'new_reaction_on_comment';
 
 // MySQL이 반환한 RowDataPacket을 테이블 스키마에 맞춰 표현한 타입(= 원본 DB 레코드 형태).
+// MySQL이 반환한 RowDataPacket을 테이블 스키마에 맞춰 표현한 타입(= 원본 DB 레코드 형태).
 export interface NotificationRow extends RowDataPacket {
   notification_id: number;
   recipient_id: number;
@@ -21,6 +22,11 @@ export interface NotificationRow extends RowDataPacket {
   entity_id: number | null;
   is_read: 0 | 1;
   created_at: Date;
+  // JOIN 된 컬럼들
+  post_title: string | null;
+  post_content: string | null;
+  board_id: number | null;
+  board_name: string | null;
 }
 
 // 애플리케이션 내부에서 사용할 도메인 모델(카멜 케이스 필드 등으로 정규화된 형태).
@@ -32,6 +38,10 @@ export interface Notification {
   entityId: number | null;
   isRead: boolean;
   createdAt: Date;
+  postTitle?: string | undefined;
+  postContent?: string | undefined;
+  boardId?: number | undefined;
+  boardName?: string | undefined;
 }
 
 // DB에서 조회한 Raw 행을 도메인 모델로 변환해 애플리케이션이 바로 사용 가능하게 만듦.
@@ -43,6 +53,10 @@ export const toNotification = (row: NotificationRow): Notification => ({
   entityId: row.entity_id,
   isRead: Boolean(row.is_read),
   createdAt: new Date(row.created_at),
+  postTitle: row.post_title ?? undefined,
+  postContent: row.post_content ?? undefined,
+  boardId: row.board_id ?? undefined,
+  boardName: row.board_name ?? undefined,
 });
 
 // 알림 생성
@@ -102,24 +116,32 @@ export async function findNotificationsByUserId(
 ): Promise<Notification[]> {
   let sql = `
     SELECT 
-      notification_id,
-      recipient_id,
-      actor_id,
-      type,
-      entity_id,
-      is_read,
-      created_at
-    FROM ${NOTIFICATIONS_TABLE}
-    WHERE recipient_id = ?
+      n.notification_id,
+      n.recipient_id,
+      n.actor_id,
+      n.type,
+      n.entity_id,
+      n.is_read,
+      n.created_at,
+      p.title AS post_title,
+      LEFT(p.content, 100) AS post_content,
+      b.board_id,
+      b.name AS board_name
+    FROM ${NOTIFICATIONS_TABLE} n
+    LEFT JOIN post p ON n.entity_id = p.post_id AND (
+      n.type IN ('new_post_in_board', 'new_comment_on_post', 'new_reply_on_comment', 'new_reaction_on_post', 'new_reaction_on_comment')
+    )
+    LEFT JOIN board b ON p.board_id = b.board_id
+    WHERE n.recipient_id = ?
   `;
   const params: (number | boolean)[] = [userId];
 
   if (isRead !== null) {
-    sql += ` AND is_read = ?`;
+    sql += ` AND n.is_read = ?`;
     params.push(isRead);
   }
 
-  sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  sql += ` ORDER BY n.created_at DESC LIMIT ? OFFSET ?`;
   params.push(limit, offset);
 
   const [rows] = await pool.query<NotificationRow[]>(sql, params);
