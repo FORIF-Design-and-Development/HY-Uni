@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, X, ChevronDown, Heart, MessageCircle } from 'lucide-react';
-<<<<<<< HEAD
+
 import { getPopularSearches, searchPosts, PopularSearchRankingItem, SearchResult } from '../../api/community/search.api';
 
 // 상대 시간 포맷팅 함수
@@ -44,9 +44,7 @@ function formatDateTime(dateString: string | null): string {
   const seconds = String(date.getSeconds()).padStart(2, '0');
   return `${year}.${month}.${day}. ${hours}:${minutes}:${seconds}`;
 }
-=======
 import { getAbsoluteUrl } from '../../utils/url';
->>>>>>> dfcf9f6d91d745b0a54b43967b7fb88228cd93fb
 
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
@@ -92,7 +90,6 @@ const SearchPage: React.FC = () => {
         }
       };
 
-<<<<<<< HEAD
       loadPopularSearches();
     }
   }, [showResults]);
@@ -134,71 +131,6 @@ const SearchPage: React.FC = () => {
       setLoading(false);
     }
   }, [showResults, initialQuery, sortBy]);
-=======
-  // Mock data for search results matching the image
-  const searchResults = [
-    {
-      id: 1,
-      boardName: '자유게시판',
-      title: '제목',
-      content: '내용',
-      likes: 23,
-      comments: 23,
-      time: '11:30',
-      hashtags: ['#해시태그', '#해시태그'],
-      hasImage: true,
-      imageUrl: null, // 실제 API 연동 시 post.previews.imageUrl 사용
-    },
-    {
-      id: 2,
-      boardName: '자유게시판',
-      title: '제목',
-      content: '내용',
-      likes: 8,
-      comments: 5,
-      time: '10:05',
-      hashtags: [],
-      hasImage: false,
-      imageUrl: null,
-    },
-    {
-      id: 3,
-      boardName: '자유게시판',
-      title: '제목',
-      content: '내용',
-      likes: 8,
-      comments: 5,
-      time: '06:48',
-      hashtags: ['#해시태그'],
-      hasImage: false,
-      imageUrl: null,
-    },
-    {
-      id: 4,
-      boardName: '자유게시판',
-      title: '제목',
-      content: '내용',
-      likes: 8,
-      comments: 5,
-      time: '3년 전',
-      hashtags: ['#해시태그', '#해시태그'],
-      hasImage: false,
-      imageUrl: null,
-    },
-    {
-      id: 5,
-      boardName: '자유게시판',
-      title: '제목',
-      content: '내용',
-      likes: 8,
-      comments: 5,
-      time: '3년 전',
-      hashtags: ['#해시태그', '#해시태그'],
-      hasImage: false,
-      imageUrl: null,
-    },
-  ];
->>>>>>> dfcf9f6d91d745b0a54b43967b7fb88228cd93fb
 
   const handleSearch = () => {
     if (searchTerm.trim()) {
@@ -427,8 +359,6 @@ const SearchPage: React.FC = () => {
                         <div className="w-16 h-16 bg-gray-200 rounded-lg shrink-0" />
                       )}
                     </div>
-<<<<<<< HEAD
-=======
                     
                     {/* Image Thumbnail */}
                     {post.hasImage && post.imageUrl && (
@@ -445,7 +375,6 @@ const SearchPage: React.FC = () => {
                     {post.hasImage && !post.imageUrl && (
                       <div className="w-16 h-16 bg-gray-200 rounded-lg shrink-0" />
                     )}
->>>>>>> dfcf9f6d91d745b0a54b43967b7fb88228cd93fb
                   </div>
                 ))}
               </div>

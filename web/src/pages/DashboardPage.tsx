@@ -100,12 +100,10 @@
 //   );
 // }
 
-
-
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { HylionWidget } from "../components/campus/HylionWidget";
-import { LibrarySeatsWidget } from '../components/campus/LibrarySeatsWidget';
+import { LibrarySeatsWidget } from "../components/campus/LibrarySeatsWidget";
 import NoticeCard from "../components/campus/NoticeCard";
 import { useNoticeStore } from "../store/useNoticeStore";
 
@@ -147,10 +145,10 @@ export default function DashboardPage() {
               link: "/campus/cafeteria",
             },
             {
-              name: "셔틀 버스",
-              icon: "🚌",
+              name: "한양대 Map",
+              icon: "🗺️",
               bg: "bg-purple-100 text-purple-600",
-              link: "/shuttle",
+              link: "/campus/map",
             },
           ].map((item) => (
             <Link

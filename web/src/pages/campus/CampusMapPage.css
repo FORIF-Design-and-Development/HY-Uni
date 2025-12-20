@@ -1,0 +1,215 @@
+/* web/src/pages/CampusMapPage.css */
+
+.map-page-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 80vh;
+}
+
+/* 검색창 영역 */
+.map-search-input {
+  width: 100%;
+  max-width: 600px;
+  padding: 14px 20px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 30px;
+  outline: none;
+  background-color: #ffffff;
+  color: #333;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.map-search-input:focus {
+  border-color: #0e4a84;
+  box-shadow: 0 4px 15px rgba(14, 74, 132, 0.15);
+}
+
+.map-search-input::placeholder {
+  color: #aaa;
+}
+
+/* 지도 컨테이너 래퍼 (그림자 및 둥근 모서리 담당) */
+.map-container-wrapper {
+  position: relative;
+  width: 100%;
+  background-color: #eef2f3;
+  border-radius: 16px;
+  overflow: hidden; /* 핀이나 이미지가 튀어나가지 않도록 */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  user-select: none; /* 드래그 방지 */
+}
+
+/* 지도 내용물 (이미지 + 핀들이 위치할 기준점) */
+.map-content {
+  position: relative;
+  width: 100%;
+  line-height: 0; /* 이미지 하단 여백 제거 */
+}
+
+/* 지도 이미지 */
+.campus-map-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none; /* 이미지가 클릭 이벤트를 가로채지 않도록 설정 */
+}
+
+/* --- 📍 핀 (Marker) 디자인 --- */
+.map-pin {
+  position: absolute;
+  /* ⭐️ 핵심: 좌표(left, top)가 핀의 '뾰족한 끝(가로 중앙, 세로 하단)'에 오도록 조정 */
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s;
+}
+
+.pin-icon {
+  font-size: 1rem; /* 핀 크기 */
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+
+.pin-label {
+  margin-top: 2px;
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #333;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  opacity: 0; /* 기본적으로는 숨김 (너무 복잡해 보이지 않게) */
+  transform: translateY(5px);
+  transition: all 0.2s ease;
+  pointer-events: none; /* 라벨이 클릭을 방해하지 않게 */
+}
+
+/* --- ✨ 상호작용 (Hover & Highlight) --- */
+
+/* 마우스를 올렸을 때 */
+.map-pin:hover {
+  z-index: 100; /* 다른 핀들보다 위로 */
+  transform: translate(-50%, -115%) scale(1.1);
+}
+
+.map-pin:hover .pin-icon {
+  transform: scale(1.1);
+}
+
+.map-pin:hover .pin-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 검색 결과 등으로 강조될 때 (.highlight 클래스) */
+.map-pin.highlight {
+  z-index: 100;
+  transform: translate(-50%, -115%) scale(1.1);
+}
+
+.map-pin.highlight .pin-icon {
+  animation: bounce 1s infinite;
+}
+
+.map-pin.highlight .pin-label {
+  opacity: 1;
+  transform: translateY(0);
+  background-color: #0e4a84;
+  color: white;
+  box-shadow: 0 4px 8px rgba(14, 74, 132, 0.3);
+}
+
+/* 검색어와 일치하지 않는 핀은 흐리게 처리 (.dimmed 클래스) */
+.map-pin.dimmed {
+  opacity: 0.15;
+  filter: grayscale(100%);
+  transform: translate(-50%, -100%) scale(0.8);
+  z-index: 1;
+}
+
+/* 통통 튀는 애니메이션 */
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* --- 하단 건물 정보 카드 --- */
+.building-info-card {
+  position: fixed; /* 화면 하단 고정 또는 컨테이너 하단 배치 선택 가능 */
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 500px;
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 200;
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+}
+
+.building-detail-img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 12px;
+  background-color: #f5f5f5;
+  margin-bottom: 15px;
+}
+
+/* 모바일 대응 */
+@media (max-width: 768px) {
+  .map-page-container {
+    padding: 10px;
+  }
+
+  .pin-icon {
+    font-size: 0.5rem; /* 모바일에서는 핀 크기 조금 축소 */
+  }
+
+  .building-info-card {
+    width: 95%;
+    bottom: 20px;
+    padding: 20px;
+  }
+}
