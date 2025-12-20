@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, User, Heart, MessageCircle, Bookmark, XSquare, CornerDownRight, Send, Check, EyeOff, X, LayoutGrid, Trash2, PenLine, MoreHorizontal, BarChart2 } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, User, Heart, MessageCircle, Bookmark, XSquare, CornerDownRight, Send, Check, EyeOff, X, LayoutGrid, Trash2, PenLine, MoreHorizontal, BarChart2, Loader2, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { getPostDetail, togglePostReaction, togglePostScrap, deletePost, votePostPoll, removePostVote, type PostDetailResponse } from '../../api/community/post.api';
+import { createComment, createReply, updateComment, deleteComment, toggleCommentReaction } from '../../api/community/comment.api';
 
 interface Comment {
   id: number;
@@ -17,18 +19,69 @@ interface Comment {
   isEdited?: boolean;
 }
 
-interface PollOption {
-  id: number;
-  text: string;
-  votes: number;
-  isVoted: boolean;
+// 날짜 포맷팅 함수
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return '방금 전';
+  if (diffMins < 60) return `${diffMins}분 전`;
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  if (diffDays < 7) return `${diffDays}일 전`;
+  
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${month}/${day} ${hours}:${minutes}`;
 }
 
-interface Poll {
-  options: PollOption[];
-  allowMultiple: boolean;
-  totalVotes: number;
-  isClosed?: boolean;
+// 댓글 계층 구조를 평면 배열로 변환
+function flattenComments(comments: PostDetailResponse['comments']): Comment[] {
+  const result: Comment[] = [];
+  let anonymousCounter = 0;
+  
+  const processComment = (comment: PostDetailResponse['comments'][0], isReply: boolean) => {
+    const authorName = comment.author.isPostAuthor 
+      ? '글쓴이' 
+      : comment.author.nickname === '익명' 
+        ? `익명${++anonymousCounter}` 
+        : comment.author.nickname;
+    
+    result.push({
+      id: comment.id,
+      author: authorName,
+      isAuthor: comment.author.isPostAuthor,
+      content: comment.content,
+      time: formatDate(comment.timestamps.createdAt),
+      likes: comment.counts.likes,
+      isLiked: comment.userInteraction.reaction === 'like',
+      isReply,
+      isSecret: comment.isSecret,
+      isBlocked: comment.isBlockedByFilter,
+      isDeleted: comment.status === 'deleted',
+      isEdited: comment.status === 'edited',
+    });
+    
+    // 대댓글 처리
+    if (comment.replies && comment.replies.length > 0) {
+      comment.replies.forEach((reply) => {
+        processComment(reply, true);
+      });
+    }
+  };
+  
+  comments.forEach((comment) => {
+    if (comment.parentCommentId === null) {
+      processComment(comment, false);
+    }
+  });
+  
+  return result;
 }
 
 const PostDetailPage: React.FC = () => {
@@ -43,54 +96,62 @@ const PostDetailPage: React.FC = () => {
   const updatedPost = location.state?.updatedPost;
   const boardType = location.state?.boardType;
 
-  // Post Data State with Poll
-  const [postData, setPostData] = useState<{
-      title: string;
-      content: string;
-      time: string;
-      isEdited: boolean;
-      poll?: Poll;
-  }>({
-    title: '크리스마스 기다려져><',
-    content: '크리스마스 때 다들 뭐할 거야??\n나만 아직 계획없는 거 아니지\n\n일본 가고 싶은데 어느 도시로 갈지 모르겠어ㅠㅠ',
-    time: '09/30 11:30',
-    isEdited: false,
-    poll: { // Mock Poll Data
-        allowMultiple: false,
-        totalVotes: 12,
-        options: [
-            { id: 1, text: '도쿄 (디즈니랜드 가야지)', votes: 5, isVoted: false },
-            { id: 2, text: '오사카 (유니버셜 스튜디오!)', votes: 4, isVoted: true }, // Current user voted here
-            { id: 3, text: '삿포로 (눈 구경)', votes: 3, isVoted: false },
-            { id: 4, text: '후쿠오카 (온천 여행)', votes: 0, isVoted: false }
-        ]
-    }
-  });
+  // Post Data State
+  const [postDetail, setPostDetail] = useState<PostDetailResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load post detail on mount
+  useEffect(() => {
+    const loadPostDetail = async () => {
+      if (!id) return;
+      
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getPostDetail(Number(id));
+        setPostDetail(data);
+        // 미디어 갤러리 인덱스 초기화
+        setCurrentMediaIndex(0);
+      } catch (err: any) {
+        setError(err.response?.data?.error?.message || '게시글을 불러오는데 실패했습니다.');
+        console.error('Failed to load post detail:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPostDetail();
+  }, [id]);
 
   // Update post data if returning from edit
   useEffect(() => {
-    if (updatedPost) {
-      setPostData(prev => ({
+    if (updatedPost && postDetail) {
+      setPostDetail(prev => prev ? {
         ...prev,
         title: updatedPost.title,
         content: updatedPost.content,
-        isEdited: true,
-      }));
+        status: 'edited',
+        timestamps: {
+          ...prev.timestamps,
+          updatedAt: new Date().toISOString(),
+        },
+      } : null);
     }
-  }, [updatedPost]);
+  }, [updatedPost, postDetail]);
 
   // UI State
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
 
-  // Interaction State
-  const [isLiked, setIsLiked] = useState(false);
-  const [isDisliked, setIsDisliked] = useState(false);
-  const [isScrapped, setIsScrapped] = useState(false);
-  const [likeCount, setLikeCount] = useState(3);
-  const [dislikeCount, setDislikeCount] = useState(1);
-  const [scrapCount, setScrapCount] = useState(1);
+  // Interaction State (derived from postDetail)
+  const isLiked = postDetail?.userInteraction.reaction === 'like';
+  const isDisliked = postDetail?.userInteraction.reaction === 'dislike';
+  const isScrapped = postDetail?.userInteraction.isScrapped || false;
+  const likeCount = postDetail?.counts.likes || 0;
+  const dislikeCount = postDetail?.counts.dislikes || 0;
+  const scrapCount = postDetail?.counts.scraps || 0;
 
   // Comment State
   const [commentInput, setCommentInput] = useState('');
@@ -102,63 +163,21 @@ const PostDetailPage: React.FC = () => {
   const [activeCommentMenuId, setActiveCommentMenuId] = useState<number | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editCommentContent, setEditCommentContent] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
+  
+  // Media Gallery State
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
-  // Mock Comments Data
-  const [comments, setComments] = useState<Comment[]>([
-    {
-      id: 1,
-      author: '익명1',
-      isAuthor: false,
-      content: '크리스마스 빨리 왔음 좋겠당><\n나는 뭐할지도 모르겠는데...?',
-      time: '09/30 13:30',
-      likes: 3,
-      isLiked: false,
-      isReply: false,
-    },
-    {
-      id: 2,
-      author: '글쓴이',
-      isAuthor: true,
-      content: '남친이나 여친없어?\n가까운 데 놀러가 ㄱㄱ',
-      time: '09/30 13:30',
-      likes: 1,
-      isLiked: false,
-      isReply: true,
-    },
-    {
-        id: 3,
-        author: '나',
-        isAuthor: false,
-        content: '남친이나 여친없으세요?\n가까운 데 놀러가세요.',
-        time: '09/30 13:30',
-        likes: 0,
-        isLiked: false,
-        isReply: true,
-        isSecret: false,
-    },
-    {
-        id: 4,
-        author: '(차단)',
-        isAuthor: false,
-        content: '차단된 키워드를 포함한 댓글입니다.',
-        time: '',
-        likes: 0,
-        isLiked: false,
-        isReply: true,
-        isBlocked: true,
-    },
-    {
-        id: 5,
-        author: '(삭제)',
-        isAuthor: false,
-        content: '삭제된 댓글입니다.',
-        time: '',
-        likes: 0,
-        isLiked: false,
-        isReply: false,
-        isDeleted: true,
-    }
-  ]);
+  // Comments Data (derived from postDetail)
+  const comments: Comment[] = postDetail ? flattenComments(postDetail.comments) : [];
+
+  // 요청 순서 추적을 위한 ref들
+  const reactionRequestIdRef = useRef(0);
+  const scrapRequestIdRef = useRef(0);
+  const commentReactionRequestIdRef = useRef<Map<number, number>>(new Map());
+  const commentEditRequestIdRef = useRef<Map<number, number>>(new Map());
+  const commentDeleteRequestIdRef = useRef(0);
 
   const handleBack = () => {
       if (boardType === 'international') {
@@ -173,50 +192,402 @@ const PostDetailPage: React.FC = () => {
   };
 
   // Handlers
-  const handleLike = () => {
-    if (isLiked) {
-      setIsLiked(false);
-      setLikeCount(prev => prev - 1);
-    } else {
-      setIsLiked(true);
-      setLikeCount(prev => prev + 1);
-      if (isDisliked) {
-        setIsDisliked(false);
-        setDislikeCount(prev => prev - 1);
+  const handleLike = async () => {
+    if (!id || !postDetail) return;
+    
+    // 요청 ID 증가
+    const requestId = ++reactionRequestIdRef.current;
+    
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    const currentReaction = postDetail.userInteraction.reaction;
+    const wasLiked = currentReaction === 'like';
+    const wasDisliked = currentReaction === 'dislike';
+    
+    setPostDetail(prev => prev ? {
+      ...prev,
+      counts: {
+        ...prev.counts,
+        likes: wasLiked ? prev.counts.likes - 1 : prev.counts.likes + 1,
+        dislikes: wasDisliked ? prev.counts.dislikes - 1 : prev.counts.dislikes,
+      },
+      userInteraction: {
+        ...prev.userInteraction,
+        reaction: wasLiked ? null : 'like',
+      },
+    } : null);
+    
+    // 백그라운드에서 API 호출
+    try {
+      const result = await togglePostReaction(Number(id), 'like');
+      // 가장 최근 요청인지 확인
+      if (requestId === reactionRequestIdRef.current) {
+        // 성공 시 서버 응답으로 최종 동기화
+        setPostDetail(prev => prev ? {
+          ...prev,
+          counts: {
+            ...prev.counts,
+            likes: result.likesCount,
+            dislikes: result.dislikesCount,
+          },
+          userInteraction: {
+            ...prev.userInteraction,
+            reaction: result.userReaction,
+          },
+        } : null);
       }
+    } catch (err) {
+      // 가장 최근 요청인지 확인
+      if (requestId === reactionRequestIdRef.current) {
+        // 실패 시 롤백
+        if (id) {
+          const data = await getPostDetail(Number(id));
+          setPostDetail(data);
+        }
+      }
+      console.error('Failed to toggle like:', err);
     }
   };
 
-  const handleDislike = () => {
-    if (isDisliked) {
-      setIsDisliked(false);
-      setDislikeCount(prev => prev - 1);
-    } else {
-      setIsDisliked(true);
-      setDislikeCount(prev => prev + 1);
-      if (isLiked) {
-        setIsLiked(false);
-        setLikeCount(prev => prev - 1);
+  const handleDislike = async () => {
+    if (!id || !postDetail) return;
+    
+    // 요청 ID 증가
+    const requestId = ++reactionRequestIdRef.current;
+    
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    const currentReaction = postDetail.userInteraction.reaction;
+    const wasLiked = currentReaction === 'like';
+    const wasDisliked = currentReaction === 'dislike';
+    
+    setPostDetail(prev => prev ? {
+      ...prev,
+      counts: {
+        ...prev.counts,
+        likes: wasLiked ? prev.counts.likes - 1 : prev.counts.likes,
+        dislikes: wasDisliked ? prev.counts.dislikes - 1 : prev.counts.dislikes + 1,
+      },
+      userInteraction: {
+        ...prev.userInteraction,
+        reaction: wasDisliked ? null : 'dislike',
+      },
+    } : null);
+    
+    // 백그라운드에서 API 호출
+    try {
+      const result = await togglePostReaction(Number(id), 'dislike');
+      // 가장 최근 요청인지 확인
+      if (requestId === reactionRequestIdRef.current) {
+        // 성공 시 서버 응답으로 최종 동기화
+        setPostDetail(prev => prev ? {
+          ...prev,
+          counts: {
+            ...prev.counts,
+            likes: result.likesCount,
+            dislikes: result.dislikesCount,
+          },
+          userInteraction: {
+            ...prev.userInteraction,
+            reaction: result.userReaction,
+          },
+        } : null);
       }
+    } catch (err) {
+      // 가장 최근 요청인지 확인
+      if (requestId === reactionRequestIdRef.current) {
+        // 실패 시 롤백
+        if (id) {
+          const data = await getPostDetail(Number(id));
+          setPostDetail(data);
+        }
+      }
+      console.error('Failed to toggle dislike:', err);
     }
   };
 
-  const handleScrap = () => {
-    setIsScrapped(!isScrapped);
-    setScrapCount(prev => isScrapped ? prev - 1 : prev + 1);
+  const handleScrap = async () => {
+    if (!id || !postDetail) return;
+    
+    // 요청 ID 증가
+    const requestId = ++scrapRequestIdRef.current;
+    
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    const currentScrapped = postDetail.userInteraction.isScrapped;
+    
+    setPostDetail(prev => prev ? {
+      ...prev,
+      counts: {
+        ...prev.counts,
+        scraps: currentScrapped ? prev.counts.scraps - 1 : prev.counts.scraps + 1,
+      },
+      userInteraction: {
+        ...prev.userInteraction,
+        isScrapped: !currentScrapped,
+      },
+    } : null);
+    
+    // 백그라운드에서 API 호출
+    try {
+      const result = await togglePostScrap(Number(id));
+      // 가장 최근 요청인지 확인
+      if (requestId === scrapRequestIdRef.current) {
+        // 성공 시 서버 응답으로 최종 동기화
+        setPostDetail(prev => prev ? {
+          ...prev,
+          counts: {
+            ...prev.counts,
+            scraps: result.scrapCount,
+          },
+          userInteraction: {
+            ...prev.userInteraction,
+            isScrapped: result.isScrapped,
+          },
+        } : null);
+      }
+    } catch (err) {
+      // 가장 최근 요청인지 확인
+      if (requestId === scrapRequestIdRef.current) {
+        // 실패 시 롤백
+        if (id) {
+          const data = await getPostDetail(Number(id));
+          setPostDetail(data);
+        }
+      }
+      console.error('Failed to toggle scrap:', err);
+    }
   };
 
-  const toggleCommentLike = (commentId: number) => {
-    setComments(comments.map(comment => {
-      if (comment.id === commentId) {
-        return {
-          ...comment,
-          isLiked: !comment.isLiked,
-          likes: comment.isLiked ? comment.likes - 1 : comment.likes + 1
-        };
+  const toggleCommentLike = async (commentId: number) => {
+    if (!postDetail) return;
+    
+    // 댓글별 요청 ID 증가
+    const currentId = commentReactionRequestIdRef.current.get(commentId) || 0;
+    const requestId = currentId + 1;
+    commentReactionRequestIdRef.current.set(commentId, requestId);
+    
+    // 댓글 찾기 헬퍼 함수
+    const findComment = (comments: PostDetailResponse['comments'], targetId: number): PostDetailResponse['comments'][0] | null => {
+      for (const comment of comments) {
+        if (comment.id === targetId) return comment;
+        if (comment.replies && comment.replies.length > 0) {
+          for (const reply of comment.replies) {
+            if (reply.id === targetId) return reply;
+            // 중첩 대댓글도 확인
+            if (reply.replies && reply.replies.length > 0) {
+              for (const nestedReply of reply.replies) {
+                if (nestedReply.id === targetId) return nestedReply;
+              }
+            }
+          }
+        }
       }
-      return comment;
-    }));
+      return null;
+    };
+    
+    const comment = findComment(postDetail.comments, commentId);
+    if (!comment) return;
+    
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    const currentReaction = comment.userInteraction.reaction;
+    const wasLiked = currentReaction === 'like';
+    const wasDisliked = currentReaction === 'dislike';
+    
+    setPostDetail(prev => prev ? {
+      ...prev,
+      comments: prev.comments.map(c => {
+        // 부모 댓글인 경우
+        if (c.id === commentId) {
+          return {
+            ...c,
+            counts: {
+              likes: wasLiked ? c.counts.likes - 1 : c.counts.likes + 1,
+              dislikes: wasDisliked ? c.counts.dislikes - 1 : c.counts.dislikes,
+            },
+            userInteraction: {
+              reaction: wasLiked ? null : 'like',
+            },
+          };
+        }
+        // 대댓글인 경우
+        if (c.replies && c.replies.length > 0) {
+          return {
+            ...c,
+            replies: c.replies.map(reply => {
+              if (reply.id === commentId) {
+                return {
+                  ...reply,
+                  counts: {
+                    likes: wasLiked ? reply.counts.likes - 1 : reply.counts.likes + 1,
+                    dislikes: wasDisliked ? reply.counts.dislikes - 1 : reply.counts.dislikes,
+                  },
+                  userInteraction: {
+                    reaction: wasLiked ? null : 'like',
+                  },
+                };
+              }
+              // 중첩 대댓글
+              if (reply.replies && reply.replies.length > 0) {
+                return {
+                  ...reply,
+                  replies: reply.replies.map((nestedReply: PostDetailResponse['comments'][0]) => 
+                    nestedReply.id === commentId
+                      ? {
+                          ...nestedReply,
+                          counts: {
+                            likes: wasLiked ? nestedReply.counts.likes - 1 : nestedReply.counts.likes + 1,
+                            dislikes: wasDisliked ? nestedReply.counts.dislikes - 1 : nestedReply.counts.dislikes,
+                          },
+                          userInteraction: {
+                            reaction: wasLiked ? null : 'like',
+                          },
+                        }
+                      : nestedReply
+                  ),
+                };
+              }
+              return reply;
+            }),
+          };
+        }
+        return c;
+      }),
+    } : null);
+    
+    // 백그라운드에서 API 호출
+    try {
+      await toggleCommentReaction(commentId, 'like');
+      // 가장 최근 요청인지 확인
+      if (requestId === commentReactionRequestIdRef.current.get(commentId)) {
+        // 성공 시 전체 재조회하지 않고 낙관적 업데이트 유지
+        // 필요시 여기서 서버 응답으로 동기화 가능
+      }
+    } catch (err) {
+      // 가장 최근 요청인지 확인
+      if (requestId === commentReactionRequestIdRef.current.get(commentId)) {
+        // 실패 시 롤백
+        if (id) {
+          const data = await getPostDetail(Number(id));
+          setPostDetail(data);
+        }
+      }
+      console.error('Failed to toggle comment like:', err);
+    }
+  };
+
+  const toggleCommentDislike = async (commentId: number) => {
+    if (!postDetail) return;
+    
+    // 댓글별 요청 ID 증가
+    const currentId = commentReactionRequestIdRef.current.get(commentId) || 0;
+    const requestId = currentId + 1;
+    commentReactionRequestIdRef.current.set(commentId, requestId);
+    
+    // 댓글 찾기 헬퍼 함수
+    const findComment = (comments: PostDetailResponse['comments'], targetId: number): PostDetailResponse['comments'][0] | null => {
+      for (const comment of comments) {
+        if (comment.id === targetId) return comment;
+        if (comment.replies && comment.replies.length > 0) {
+          for (const reply of comment.replies) {
+            if (reply.id === targetId) return reply;
+            // 중첩 대댓글도 확인
+            if (reply.replies && reply.replies.length > 0) {
+              for (const nestedReply of reply.replies) {
+                if (nestedReply.id === targetId) return nestedReply;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    };
+    
+    const comment = findComment(postDetail.comments, commentId);
+    if (!comment) return;
+    
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    const currentReaction = comment.userInteraction.reaction;
+    const wasLiked = currentReaction === 'like';
+    const wasDisliked = currentReaction === 'dislike';
+    
+    setPostDetail(prev => prev ? {
+      ...prev,
+      comments: prev.comments.map(c => {
+        // 부모 댓글인 경우
+        if (c.id === commentId) {
+          return {
+            ...c,
+            counts: {
+              likes: wasLiked ? c.counts.likes - 1 : c.counts.likes,
+              dislikes: wasDisliked ? c.counts.dislikes - 1 : c.counts.dislikes + 1,
+            },
+            userInteraction: {
+              reaction: wasDisliked ? null : 'dislike',
+            },
+          };
+        }
+        // 대댓글인 경우
+        if (c.replies && c.replies.length > 0) {
+          return {
+            ...c,
+            replies: c.replies.map(reply => {
+              if (reply.id === commentId) {
+                return {
+                  ...reply,
+                  counts: {
+                    likes: wasLiked ? reply.counts.likes - 1 : reply.counts.likes,
+                    dislikes: wasDisliked ? reply.counts.dislikes - 1 : reply.counts.dislikes + 1,
+                  },
+                  userInteraction: {
+                    reaction: wasDisliked ? null : 'dislike',
+                  },
+                };
+              }
+              // 중첩 대댓글
+              if (reply.replies && reply.replies.length > 0) {
+                return {
+                  ...reply,
+                  replies: reply.replies.map((nestedReply: PostDetailResponse['comments'][0]) => 
+                    nestedReply.id === commentId
+                      ? {
+                          ...nestedReply,
+                          counts: {
+                            likes: wasLiked ? nestedReply.counts.likes - 1 : nestedReply.counts.likes,
+                            dislikes: wasDisliked ? nestedReply.counts.dislikes - 1 : nestedReply.counts.dislikes + 1,
+                          },
+                          userInteraction: {
+                            reaction: wasDisliked ? null : 'dislike',
+                          },
+                        }
+                      : nestedReply
+                  ),
+                };
+              }
+              return reply;
+            }),
+          };
+        }
+        return c;
+      }),
+    } : null);
+    
+    // 백그라운드에서 API 호출
+    try {
+      await toggleCommentReaction(commentId, 'dislike');
+      // 가장 최근 요청인지 확인
+      if (requestId === commentReactionRequestIdRef.current.get(commentId)) {
+        // 성공 시 전체 재조회하지 않고 낙관적 업데이트 유지
+        // 필요시 여기서 서버 응답으로 동기화 가능
+      }
+    } catch (err) {
+      // 가장 최근 요청인지 확인
+      if (requestId === commentReactionRequestIdRef.current.get(commentId)) {
+        // 실패 시 롤백
+        if (id) {
+          const data = await getPostDetail(Number(id));
+          setPostDetail(data);
+        }
+      }
+      console.error('Failed to toggle comment dislike:', err);
+    }
   };
 
   const handleReplyClick = (commentId: number) => {
@@ -242,20 +613,80 @@ const PostDetailPage: React.FC = () => {
       setActiveCommentMenuId(null);
   };
 
-  const handleSaveEditedComment = (commentId: number) => {
-      if (!editCommentContent.trim()) return;
+  const handleSaveEditedComment = async (commentId: number) => {
+      if (!editCommentContent.trim() || !postDetail) return;
       
-      setComments(comments.map(c => 
-          c.id === commentId 
-          ? { 
-              ...c, 
-              content: editCommentContent, 
-              isEdited: true, 
-              time: '09/30 15:30' // Updated mock time
-            } 
-          : c
-      ));
+      // 댓글별 요청 ID 증가
+      const currentId = commentEditRequestIdRef.current.get(commentId) || 0;
+      const requestId = currentId + 1;
+      commentEditRequestIdRef.current.set(commentId, requestId);
+      
+      const newContent = editCommentContent.trim();
+      const now = new Date().toISOString();
+      
+      // 낙관적 업데이트: 즉시 UI 업데이트
+      setPostDetail(prev => prev ? {
+        ...prev,
+        comments: prev.comments.map(comment => {
+          // 부모 댓글인 경우
+          if (comment.id === commentId) {
+            return {
+              ...comment,
+              content: newContent,
+              status: 'edited',
+              timestamps: {
+                ...comment.timestamps,
+                updatedAt: now,
+              },
+            };
+          }
+          // 대댓글인 경우
+          if (comment.replies && comment.replies.length > 0) {
+            return {
+              ...comment,
+              replies: comment.replies.map(reply => 
+                reply.id === commentId
+                  ? {
+                      ...reply,
+                      content: newContent,
+                      status: 'edited',
+                      timestamps: {
+                        ...reply.timestamps,
+                        updatedAt: now,
+                      },
+                    }
+                  : reply
+              ),
+            };
+          }
+          return comment;
+        }),
+      } : null);
+      
       setEditingCommentId(null);
+      const savedContent = editCommentContent;
+      setEditCommentContent('');
+      
+      // 백그라운드에서 API 호출
+      try {
+        await updateComment(commentId, newContent);
+        // 가장 최근 요청인지 확인
+        if (requestId === commentEditRequestIdRef.current.get(commentId)) {
+          // 성공 시 전체 재조회하지 않고 낙관적 업데이트 유지
+        }
+      } catch (err) {
+        // 가장 최근 요청인지 확인
+        if (requestId === commentEditRequestIdRef.current.get(commentId)) {
+          // 실패 시 롤백
+          if (id) {
+            const data = await getPostDetail(Number(id));
+            setPostDetail(data);
+          }
+          setEditCommentContent(savedContent);
+          setEditingCommentId(commentId);
+        }
+        console.error('Failed to update comment:', err);
+      }
   };
 
   const initiateDeleteComment = (commentId: number) => {
@@ -263,105 +694,182 @@ const PostDetailPage: React.FC = () => {
       setActiveCommentMenuId(null);
   };
 
-  const confirmDeleteComment = () => {
-      if (commentToDelete === null) return;
+  const confirmDeleteComment = async () => {
+      if (commentToDelete === null || !postDetail) return;
       
-      setComments(comments.map(c => 
-          c.id === commentToDelete 
-          ? { 
-              ...c, 
-              isDeleted: true, 
-              content: '삭제된 댓글입니다.', 
-              author: '(삭제)', 
-              isAuthor: false,
-              likes: 0
-            } 
-          : c
-      ));
+      // 요청 ID 증가
+      const requestId = ++commentDeleteRequestIdRef.current;
+      
+      const commentIdToDelete = commentToDelete;
+      
+      // 낙관적 업데이트: 즉시 UI 업데이트 (status를 'deleted'로 변경)
+      setPostDetail(prev => prev ? {
+        ...prev,
+        counts: {
+          ...prev.counts,
+          comments: prev.counts.comments - 1,
+        },
+        comments: prev.comments.map(comment => {
+          // 부모 댓글인 경우
+          if (comment.id === commentIdToDelete) {
+            return {
+              ...comment,
+              status: 'deleted',
+              content: '삭제된 댓글입니다.',
+            };
+          }
+          // 대댓글인 경우
+          if (comment.replies && comment.replies.length > 0) {
+            return {
+              ...comment,
+              replies: comment.replies.map(reply => 
+                reply.id === commentIdToDelete
+                  ? {
+                      ...reply,
+                      status: 'deleted',
+                      content: '삭제된 댓글입니다.',
+                    }
+                  : reply
+              ),
+            };
+          }
+          return comment;
+        }),
+      } : null);
+      
       setCommentToDelete(null);
-  };
-
-  const handleSubmitComment = () => {
-    if (!commentInput.trim()) return;
-    
-    const newComment: Comment = {
-      id: Date.now(),
-      author: isAnonymous ? '익명' : '나',
-      isAuthor: false,
-      content: commentInput,
-      time: '방금 전',
-      likes: 0,
-      isLiked: false,
-      isReply: replyingToId !== null,
-      isSecret: isSecret,
-    };
-
-    if (replyingToId !== null) {
-        const parentIndex = comments.findIndex(c => c.id === replyingToId);
-        let insertIndex = parentIndex + 1;
-        while(insertIndex < comments.length && comments[insertIndex].isReply) {
-            insertIndex++;
+      
+      // 백그라운드에서 API 호출
+      try {
+        await deleteComment(commentIdToDelete);
+        // 가장 최근 요청인지 확인
+        if (requestId === commentDeleteRequestIdRef.current) {
+          // 성공 시 전체 재조회하지 않고 낙관적 업데이트 유지
         }
-        
-        const newComments = [...comments];
-        newComments.splice(insertIndex, 0, newComment);
-        setComments(newComments);
-        setReplyingToId(null);
-    } else {
-        setComments([...comments, newComment]);
-    }
-    setCommentInput('');
-    // Scroll to bottom or new comment logic could be added here
+      } catch (err) {
+        // 가장 최근 요청인지 확인
+        if (requestId === commentDeleteRequestIdRef.current) {
+          // 실패 시 롤백
+          if (id) {
+            const data = await getPostDetail(Number(id));
+            setPostDetail(data);
+          }
+        }
+        console.error('Failed to delete comment:', err);
+      }
   };
 
-  const handleDeletePost = () => {
-      // Logic to delete post, then redirect to My Board list
-      navigate('/community/board/my');
+  const handleSubmitComment = async () => {
+    if (!commentInput.trim() || !id || isSubmittingComment) return;
+    
+    setIsSubmittingComment(true);
+    
+    try {
+      const payload = {
+        content: commentInput.trim(),
+        isAnonymous,
+        isSecret,
+      };
+      
+      if (replyingToId !== null) {
+        await createReply(replyingToId, payload);
+      } else {
+        await createComment(Number(id), payload);
+      }
+      
+      setCommentInput('');
+      setReplyingToId(null);
+      
+      // API 호출 성공 후 전체 재조회
+      const data = await getPostDetail(Number(id));
+      setPostDetail(data);
+    } catch (err) {
+      console.error('Failed to submit comment:', err);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleDeletePost = async () => {
+      if (!id) return;
+      
+      try {
+        await deletePost(Number(id));
+        navigate('/community/board/my');
+      } catch (err) {
+        console.error('Failed to delete post:', err);
+        setShowDeleteModal(false);
+      }
   };
 
   const handleEditPost = () => {
+      if (!postDetail) return;
       setShowMenu(false);
       navigate(`/community/post/${id}/edit`, {
           state: {
               initialData: {
-                  title: postData.title,
-                  content: postData.content
+                  title: postDetail.title,
+                  content: postDetail.content
               },
-              isMyPost: true,
-              boardName: boardName,
+              isMyPost: postDetail.author.isMine,
+              boardName: postDetail.board.name,
               boardType: boardType
           }
       });
   };
 
-  const handleVote = (optionId: number) => {
-      if (!postData.poll) return;
+  const handleVote = async (optionId: number) => {
+      if (!id || !postDetail || !postDetail.poll || isVoting) return;
 
-      const newOptions = postData.poll.options.map(opt => {
-          if (postData.poll!.allowMultiple) {
-              if (opt.id === optionId) {
-                  return { ...opt, isVoted: !opt.isVoted, votes: opt.isVoted ? opt.votes - 1 : opt.votes + 1 };
-              }
-              return opt;
-          } else {
-              if (opt.id === optionId) {
-                   return { ...opt, isVoted: true, votes: opt.votes + 1 };
-              }
-              // Unvote others if single choice
-              return { ...opt, isVoted: false, votes: opt.isVoted ? opt.votes - 1 : opt.votes };
-          }
-      });
-      
-      const newTotal = newOptions.reduce((acc, curr) => acc + curr.votes, 0);
+      setIsVoting(true);
 
-      setPostData({
-          ...postData,
-          poll: {
-              ...postData.poll,
-              options: newOptions,
-              totalVotes: newTotal
-          }
-      });
+      try {
+        const result = await votePostPoll(Number(id), optionId);
+        // 성공 시 서버 응답으로 업데이트
+        setPostDetail(prev => prev ? {
+          ...prev,
+          poll: prev.poll ? {
+            ...prev.poll,
+            userVote: result.userVote,
+            options: result.results.map(r => ({
+              id: r.id,
+              text: r.text,
+              voteCount: r.voteCount,
+            })),
+          } : null,
+        } : null);
+      } catch (err) {
+        console.error('Failed to vote:', err);
+      } finally {
+        setIsVoting(false);
+      }
+  };
+
+  const handleRemoveVote = async () => {
+      if (!id || !postDetail || !postDetail.poll || isVoting) return;
+
+      setIsVoting(true);
+
+      try {
+        const result = await removePostVote(Number(id));
+        // 성공 시 서버 응답으로 업데이트
+        setPostDetail(prev => prev ? {
+          ...prev,
+          poll: prev.poll ? {
+            ...prev.poll,
+            userVote: result.userVote,
+            options: result.results.map(r => ({
+              id: r.id,
+              text: r.text,
+              voteCount: r.voteCount,
+            })),
+          } : null,
+        } : null);
+      } catch (err) {
+        console.error('Failed to remove vote:', err);
+      } finally {
+        setIsVoting(false);
+      }
   };
 
   // Close menus when clicking outside
@@ -370,6 +878,31 @@ const PostDetailPage: React.FC = () => {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="bg-white min-h-screen font-sans flex items-center justify-center">
+        <div className="text-gray-400">로딩 중...</div>
+      </div>
+    );
+  }
+
+  if (error || !postDetail) {
+    return (
+      <div className="bg-white min-h-screen font-sans flex flex-col items-center justify-center px-4">
+        <div className="text-red-500 mb-4">{error || '게시글을 불러올 수 없습니다.'}</div>
+        <button 
+          onClick={handleBack}
+          className="px-4 py-2 bg-gray-200 rounded-lg text-gray-700"
+        >
+          돌아가기
+        </button>
+      </div>
+    );
+  }
+
+  const currentBoardName = postDetail.board.name || boardName;
+  const isMyPostCheck = postDetail.author.isMine || isMyPost;
 
   return (
     <div className="bg-white min-h-screen font-sans flex flex-col relative pb-20">
@@ -381,10 +914,10 @@ const PostDetailPage: React.FC = () => {
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h1 className="flex-1 text-center text-lg font-bold text-gray-900">{boardName}</h1>
+        <h1 className="flex-1 text-center text-lg font-bold text-gray-900">{currentBoardName}</h1>
         
         {/* Right Icon: Menu for author, Report for others */}
-        {isMyPost ? (
+        {isMyPostCheck ? (
             <div className="relative">
                 <button 
                     onClick={() => setShowMenu(!showMenu)}
@@ -434,89 +967,201 @@ const PostDetailPage: React.FC = () => {
             <User className="w-6 h-6 text-gray-400" />
           </div>
           <div>
-            <div className="font-bold text-gray-900 text-sm">익명</div>
+            <div className="font-bold text-gray-900 text-sm">{postDetail.author.nickname}</div>
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <span>{postData.time}</span>
-                {postData.isEdited && <span>(수정됨)</span>}
+                <span>{formatDate(postDetail.timestamps.createdAt)}</span>
+                {postDetail.status === 'edited' && <span>(수정됨)</span>}
             </div>
           </div>
         </div>
 
         {/* Title & Body */}
-        <h2 className="text-xl font-bold text-gray-900 mb-3 leading-snug">{postData.title}</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-3 leading-snug">{postDetail.title}</h2>
         <p className="text-base text-gray-600 mb-6 leading-relaxed whitespace-pre-wrap">
-          {postData.content}
+          {postDetail.content}
         </p>
 
-        {/* Poll Section */}
-        {postData.poll && (
-            <div className="mb-6 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <BarChart2 className="w-5 h-5 text-blue-500" />
-                        <span className="font-bold text-gray-900">투표</span>
+        {/* Media Gallery (Images & Videos) - 텍스트 바로 다음 */}
+        {(() => {
+          const allMedia = [
+            ...postDetail.attachments.images.map(img => ({ type: 'image' as const, url: img.url })),
+            ...postDetail.attachments.videos.map(vid => ({ type: 'video' as const, url: vid.url }))
+          ];
+          
+          if (allMedia.length === 0) return null;
+          
+          return (
+            <div className="mb-6 relative flex items-center gap-2">
+              {/* Left Arrow - 이미지 왼쪽 여백 */}
+              {allMedia.length > 1 && (
+                <button
+                  onClick={() => setCurrentMediaIndex(prev => (prev > 0 ? prev - 1 : allMedia.length - 1))}
+                  className="w-8 h-8 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full flex items-center justify-center transition-colors shrink-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              )}
+              
+              {/* Media Container */}
+              <div className="relative flex-1 max-w-[280px] mx-auto aspect-square bg-gray-100 rounded-xl overflow-hidden">
+                <div 
+                  className="flex transition-transform duration-300 ease-out h-full"
+                  style={{ transform: `translateX(-${currentMediaIndex * 100}%)` }}
+                >
+                  {allMedia.map((media, idx) => (
+                    <div key={idx} className="min-w-full h-full relative flex items-center justify-center bg-black">
+                      {media.type === 'image' ? (
+                        <img 
+                          src={media.url} 
+                          alt={`게시글 이미지 ${idx + 1}`}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="relative w-full h-full">
+                          <video 
+                            src={media.url}
+                            className="w-full h-full object-contain"
+                            controls
+                          />
+                          <div className="absolute top-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                            <Play className="w-3 h-3" />
+                            동영상
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-xs text-gray-500 font-medium">
-                        {postData.poll.totalVotes}명 참여 {postData.poll.allowMultiple ? '· 복수선택' : ''}
-                    </span>
+                  ))}
                 </div>
                 
-                <div className="space-y-2">
-                    {postData.poll.options.map(option => {
-                        const percent = postData.poll!.totalVotes > 0 
-                            ? Math.round((option.votes / postData.poll!.totalVotes) * 100) 
-                            : 0;
-                        
-                        return (
-                            <div 
-                                key={option.id}
-                                onClick={() => handleVote(option.id)}
-                                className={`relative border rounded-lg p-3 cursor-pointer transition-all overflow-hidden btn-press ${
-                                    option.isVoted 
-                                    ? 'border-blue-500 bg-blue-50' 
-                                    : 'border-gray-200 bg-white hover:border-gray-300'
+                {/* Media Indicators */}
+                {allMedia.length > 1 && (
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                    {allMedia.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentMediaIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all ${
+                          idx === currentMediaIndex 
+                            ? 'bg-white w-6' 
+                            : 'bg-white/50 w-1.5 hover:bg-white/75'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Right Arrow - 이미지 오른쪽 여백 */}
+              {allMedia.length > 1 && (
+                <button
+                  onClick={() => setCurrentMediaIndex(prev => (prev < allMedia.length - 1 ? prev + 1 : 0))}
+                  className="w-8 h-8 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full flex items-center justify-center transition-colors shrink-0"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Poll Section */}
+        {postDetail.poll && (() => {
+            // totalVotes를 한 번만 계산
+            const totalVotes = postDetail.poll.options.reduce((sum, opt) => sum + opt.voteCount, 0);
+            
+            return (
+                <div className="mb-6 bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <BarChart2 className="w-5 h-5 text-blue-500" />
+                            <span className="font-bold text-gray-900">투표</span>
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">
+                            {totalVotes}명 참여
+                        </span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        {postDetail.poll.options.map(option => {
+                            const percent = totalVotes > 0 
+                                ? Math.round((option.voteCount / totalVotes) * 100) 
+                                : 0;
+                            const isVoted = postDetail.poll!.userVote.selectedOptionId === option.id;
+                            
+                            return (
+                                <div 
+                                    key={option.id}
+                                    onClick={() => !isVoting && handleVote(option.id)}
+                                    className={`relative border rounded-lg p-3 transition-all overflow-hidden ${
+                                        isVoting 
+                                        ? 'cursor-not-allowed opacity-50' 
+                                        : 'cursor-pointer btn-press'
+                                    } ${
+                                        isVoted 
+                                        ? 'border-blue-500 bg-blue-50' 
+                                        : 'border-gray-200 bg-white hover:border-gray-300'
+                                    }`}
+                                >
+                                    {/* Progress Bar Background */}
+                                    <div 
+                                        className="absolute top-0 left-0 bottom-0 bg-blue-100/50 transition-all duration-500 ease-out"
+                                        style={{ width: `${percent}%` }}
+                                    />
+                                    
+                                    <div className="relative flex justify-between items-center z-10">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                                                isVoted ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
+                                            }`}>
+                                                {isVoted && <Check className="w-2.5 h-2.5 text-white animate-scale-in" strokeWidth={3} />}
+                                            </div>
+                                            <span className={`text-sm ${isVoted ? 'font-bold text-blue-600' : 'text-gray-700'}`}>
+                                                {option.text}
+                                            </span>
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-500">{option.voteCount}명 ({percent}%)</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    
+                    {postDetail.poll.userVote.selectedOptionId !== null && (
+                        <div className="mt-3 text-center">
+                            <button 
+                                onClick={handleRemoveVote}
+                                disabled={isVoting}
+                                className={`text-xs underline transition-colors ${
+                                    isVoting 
+                                    ? 'text-gray-300 cursor-not-allowed' 
+                                    : 'text-gray-400 hover:text-gray-600'
                                 }`}
                             >
-                                {/* Progress Bar Background */}
-                                <div 
-                                    className="absolute top-0 left-0 bottom-0 bg-blue-100/50 transition-all duration-500 ease-out"
-                                    style={{ width: `${percent}%` }}
-                                />
-                                
-                                <div className="relative flex justify-between items-center z-10">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
-                                            option.isVoted ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
-                                        }`}>
-                                            {option.isVoted && <Check className="w-2.5 h-2.5 text-white animate-scale-in" strokeWidth={3} />}
-                                        </div>
-                                        <span className={`text-sm ${option.isVoted ? 'font-bold text-blue-600' : 'text-gray-700'}`}>
-                                            {option.text}
-                                        </span>
-                                    </div>
-                                    <span className="text-xs font-bold text-gray-500">{option.votes}명 ({percent}%)</span>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                {isVoting ? (
+                                    <span className="flex items-center gap-1 justify-center">
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        처리 중...
+                                    </span>
+                                ) : (
+                                    '투표 다시하기'
+                                )}
+                            </button>
+                        </div>
+                    )}
                 </div>
-                
-                <div className="mt-3 text-center">
-                    <button className="text-xs text-gray-400 hover:text-gray-600 underline">
-                        투표 다시하기
-                    </button>
-                </div>
-            </div>
-        )}
+            );
+        })()}
 
         {/* Hashtags */}
-        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
-          {['#크리스마스', '#겨울방학', '#일본여행'].map((tag, idx) => (
-            <span key={idx} className="bg-blue-100 text-gray-600 px-3 py-1 rounded-lg text-xs font-medium shrink-0">
-              {tag}
-            </span>
-          ))}
-        </div>
+        {postDetail.tags.length > 0 && (
+          <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+            {postDetail.tags.map((tag) => (
+              <span key={tag.id} className="bg-blue-100 text-gray-600 px-3 py-1 rounded-lg text-xs font-medium shrink-0">
+                #{tag.name}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center justify-around py-2">
@@ -739,15 +1384,28 @@ const PostDetailPage: React.FC = () => {
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
                 placeholder={replyingToId !== null ? "대댓글을 입력하세요." : "댓글을 입력하세요."}
-                className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm outline-none focus:border-gray-400 transition-colors"
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmitComment()}
+                disabled={isSubmittingComment}
+                className={`flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm outline-none focus:border-gray-400 transition-colors ${
+                  isSubmittingComment ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                onKeyDown={(e) => e.key === 'Enter' && !isSubmittingComment && handleSubmitComment()}
             />
             <button 
                 onClick={handleSubmitComment}
-                disabled={!commentInput.trim()}
-                className={`p-2 rounded-full transition-all duration-300 ${commentInput.trim() ? 'text-blue-500 bg-blue-50 scale-100' : 'text-gray-400 bg-gray-200 scale-95'}`}
+                disabled={!commentInput.trim() || isSubmittingComment}
+                className={`p-2 rounded-full transition-all duration-300 ${
+                  isSubmittingComment 
+                    ? 'text-gray-400 bg-gray-200 scale-95 cursor-not-allowed' 
+                    : commentInput.trim() 
+                      ? 'text-blue-500 bg-blue-50 scale-100' 
+                      : 'text-gray-400 bg-gray-200 scale-95'
+                }`}
             >
-                <Send className="w-5 h-5" />
+                {isSubmittingComment ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
             </button>
         </div>
       </div>

@@ -14,6 +14,7 @@ import {
   togglePostReactionHandler,
   togglePostScrapHandler,
   votePostPollHandler,
+  removePostVoteHandler,
   getBoardPostsHandler,
 } from '../../controllers/community/post.controller';
 import { uploadFiles } from '../../controllers/community/upload.controller';
@@ -119,6 +120,9 @@ router.post('/posts/:postId/scrap', requireAuth, togglePostScrapHandler);
 
 // 게시글 투표
 router.post('/posts/:postId/vote', requireAuth, votePostPollHandler);
+
+// 게시글 투표 취소
+router.delete('/posts/:postId/vote', requireAuth, removePostVoteHandler);
 
 // 선호 키워드 목록 조회
 router.get('/me/preferred-keywords', requireAuth, getPreferredKeywords);

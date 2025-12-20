@@ -5,13 +5,6 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react
 import FindEmailTest from "./pages/auth/FindEmailTest";
 import LoginTest from "./pages/auth/LoginTest";
 import RegisterTest from "./pages/auth/RegisterTest";
-<<<<<<< HEAD
-import ResetPasswordTest from "./pages/auth/ResetPasswordTest.tsx";
-import { CafeteriaPage } from "./pages/campus/CafeteriaPage.tsx"; // ✅ 추가
-import NoticePage from "./pages/campus/NoticePage.tsx";
-import ReviewPage from "./pages/campus/ReviewPage";
-import Timetable from "./pages/campus/TimetablePage.tsx";
-=======
 import ResetPasswordTest from "./pages/auth/ResetPasswordTest";
 
 import DashboardPage from "./pages/DashboardPage";
@@ -110,8 +103,6 @@ const AnimatedRoutes = () => {
     </AnimatePresence>
   );
 };
-
->>>>>>> 4033419cdfa51d49da7aae4e815aafcd4e420467
 
 export default function App() {
   return (
