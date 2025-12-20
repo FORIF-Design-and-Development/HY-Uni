@@ -14,6 +14,7 @@ import {
   togglePostReactionHandler,
   togglePostScrapHandler,
   votePostPollHandler,
+  removePostVoteHandler,
   getBoardPostsHandler,
 } from '../../controllers/community/post.controller';
 import { uploadFiles } from '../../controllers/community/upload.controller';
@@ -34,6 +35,7 @@ import {
   deletePreferredTagsHandler,
   getPreferredTagsHandler,
   getBoardTagsHandler,
+  getAllBoardsTagsWithPreferencesHandler,
 } from '../../controllers/community/preferred-tag.controller';
 import {
   createCommentHandler,
@@ -120,6 +122,9 @@ router.post('/posts/:postId/scrap', requireAuth, togglePostScrapHandler);
 // 게시글 투표
 router.post('/posts/:postId/vote', requireAuth, votePostPollHandler);
 
+// 게시글 투표 취소
+router.delete('/posts/:postId/vote', requireAuth, removePostVoteHandler);
+
 // 선호 키워드 목록 조회
 router.get('/me/preferred-keywords', requireAuth, getPreferredKeywords);
 
@@ -137,6 +142,9 @@ router.post('/me/filter-keywords', requireAuth, addFilterKeywordsHandler);
 
 // 필터링 키워드 삭제
 router.delete('/me/filter-keywords', requireAuth, deleteFilterKeywordsHandler);
+
+// 모든 게시판의 태그와 선호 태그를 한 번에 조회
+router.get('/boards/me/tags-with-preferences', requireAuth, getAllBoardsTagsWithPreferencesHandler);
 
 // 게시판별 사용 가능한 태그 목록 조회
 router.get('/boards/:boardId/tags', requireAuth, getBoardTagsHandler);

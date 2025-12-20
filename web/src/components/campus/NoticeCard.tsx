@@ -53,9 +53,9 @@ export default function NoticeCard({ notice }: Props) {
         </h3>
 
         {/* 내용 미리보기 */}
-        <p className="text-gray-600 text-sm line-clamp-2 mt-1">
+        {/* <p className="text-gray-600 text-sm line-clamp-2 mt-1">
           {notice.content}
-        </p>
+        </p> */}
       </div>
     </div>
   );

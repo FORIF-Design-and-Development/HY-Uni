@@ -154,17 +154,6 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
     }
   }
 
-  // 정렬 조건 생성 (relevance: 제목 포함 우선, 그 다음 내용 포함, 각 그룹 내 최신순)
-  const orderBy = `
-    ORDER BY
-      CASE 
-        WHEN p.title LIKE ? THEN 1 
-        WHEN p.content LIKE ? THEN 2 
-        ELSE 3 
-      END,
-      p.created_at DESC
-  `;
-
   // boardId 필터 조건
   const boardFilter = boardId ? 'AND p.board_id = ?' : '';
 
@@ -186,7 +175,12 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
       GROUP_CONCAT(DISTINCT t.tag_id ORDER BY t.tag_id) AS tag_ids,
       GROUP_CONCAT(DISTINCT t.name ORDER BY t.tag_id) AS tag_names,
       (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'image' LIMIT 1) AS image_url,
-      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url
+      (SELECT url FROM ${ATTACHMENTS_TABLE} WHERE post_id = p.post_id AND type = 'video' LIMIT 1) AS video_url,
+      CASE 
+        WHEN p.title LIKE ? THEN 1 
+        WHEN p.content LIKE ? THEN 2 
+        ELSE 3 
+      END AS relevance_order
     FROM ${POSTS_TABLE} AS p
     LEFT JOIN ${BOARDS_TABLE} AS b ON p.board_id = b.board_id
     LEFT JOIN ${USERS_TABLE} AS u ON p.user_id = u.user_id
@@ -197,14 +191,14 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
       ${boardFilter}
       ${filterKeywordConditions}
     GROUP BY p.post_id
-    ${orderBy}
+    ORDER BY relevance_order, p.created_at DESC
     LIMIT ? OFFSET ?
   `;
 
-  // 쿼리 파라미터 구성
+  // 쿼리 파라미터 구성 - 순서 수정
   const params: any[] = [];
-  params.push(searchTerm); // ORDER BY CASE의 title LIKE 파라미터
-  params.push(searchTerm); // ORDER BY CASE의 content LIKE 파라미터
+  params.push(searchTerm); // SELECT CASE의 title LIKE 파라미터
+  params.push(searchTerm); // SELECT CASE의 content LIKE 파라미터
   params.push(searchTerm); // WHERE title LIKE
   params.push(searchTerm); // WHERE content LIKE
   if (boardId) {
@@ -216,7 +210,16 @@ export async function searchPosts(options: SearchOptions): Promise<SearchRespons
 
   // 검색 결과 조회
   const [rows] = await pool.query<SearchResultRow[]>(sql, params);
+  
+  // 디버깅: rows 확인
+  console.log('검색 쿼리 결과 rows 개수:', rows.length);
+  console.log('검색 쿼리 결과 rows 샘플:', rows.slice(0, 2));
+  
   const results = rows.map(toSearchResult);
+  
+  // 디버깅: 변환된 results 확인
+  console.log('변환된 results 개수:', results.length);
+  console.log('변환된 results 샘플:', results.slice(0, 2));
 
   // 총 결과 수 계산
   const countSql = `

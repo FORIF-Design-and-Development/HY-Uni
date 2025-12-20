@@ -85,3 +85,24 @@ export async function deletePreferredTags(
   return response.data.data;
 }
 
+// 모든 게시판의 태그와 선호 태그를 한 번에 조회하는 응답 타입
+export interface GetAllBoardsTagsWithPreferencesResponse {
+  boards: Array<{
+    boardId: number;
+    boardName: string;
+    availableTags: Tag[];
+    preferredTags: Tag[];
+  }>;
+}
+
+/**
+ * 모든 게시판의 태그와 선호 태그를 한 번에 조회
+ * @returns 모든 게시판의 태그와 선호 태그 목록
+ */
+export async function getAllBoardsTagsWithPreferences(): Promise<GetAllBoardsTagsWithPreferencesResponse> {
+  const response = await api.get<ApiResponse<GetAllBoardsTagsWithPreferencesResponse>>(
+    '/community/boards/me/tags-with-preferences'
+  );
+  return response.data.data;
+}
+
