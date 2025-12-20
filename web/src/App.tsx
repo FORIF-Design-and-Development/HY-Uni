@@ -91,7 +91,7 @@ const AnimatedRoutes = () => {
           <Route path="/hylion" element={<HylionPage />} />
 
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/" element={<Navigate to="/campus/notices" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           <Route path="/community" element={<CommunityHomePage />} />
           <Route
@@ -131,7 +131,7 @@ export default function App() {
       <ScrollToTop />
       <div className="max-w-md mx-auto min-h-screen bg-white border-x border-gray-100 shadow-2xl overflow-hidden relative">
         <nav>
-          <Link to="/">dashboard</Link>
+          <Link to="/dashboard">dashboard</Link>
         </nav>
         <AnimatedRoutes />
       </div>

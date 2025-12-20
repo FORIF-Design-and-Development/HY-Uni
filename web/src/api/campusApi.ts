@@ -19,6 +19,7 @@ export interface Place {
   averageRating: number; // avg_rating -> averageRating
   reviewCount: number; // review_count -> reviewCount
   createdAt: string;
+  image_url: string;
 }
 
 export interface Review {
