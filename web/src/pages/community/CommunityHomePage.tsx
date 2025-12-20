@@ -4,6 +4,7 @@ import { FileText, Bell, Settings, ChevronRight, Heart, MessageCircle, Info, Sta
 import { KeywordItem, PostItem, FavoriteItem } from '../../types';
 import { motion } from 'framer-motion';
 import { getHomeData, type HomeDataResponse } from '../../api/community/home.api';
+import { toKST } from '../../utils/date';
 
 const CommunityHomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -32,9 +33,9 @@ const CommunityHomePage: React.FC = () => {
     return positions.slice(0, Math.min(count, 5));
   };
 
-  // ISO 날짜 문자열을 MM/DD 및 HH:MM 형식으로 변환
+  // ISO 날짜 문자열을 MM/DD 및 HH:MM 형식으로 변환 (한국 시간 기준)
   const formatDateTime = (isoString: string): { date: string; time: string } => {
-    const date = new Date(isoString);
+    const date = toKST(isoString);
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
