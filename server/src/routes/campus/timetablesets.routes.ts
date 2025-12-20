@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuth } from "../../middlewares/error";
 import {
   getAllSets,
   createSet,
@@ -7,8 +8,8 @@ import {
 
 const router = Router();
 
-router.get("/", getAllSets);
-router.post("/", createSet);
-router.delete("/:id", deleteSet);
+router.get("/", requireAuth, getAllSets);
+router.post("/", requireAuth, createSet);
+router.delete("/:id", requireAuth, deleteSet);
 
 export default router;
