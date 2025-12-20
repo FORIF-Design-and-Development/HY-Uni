@@ -6,7 +6,6 @@ import NoticeCard from "../components/campus/NoticeCard";
 import { useNoticeStore } from "../store/useNoticeStore";
 import { useTimetableStore } from "../store/timetable.store";
 
-
 export default function DashboardPage() {
   const { notices, fetchNotices } = useNoticeStore();
   const { sets, selectedSet, loadSets } = useTimetableStore();
@@ -16,12 +15,12 @@ export default function DashboardPage() {
   }, [fetchNotices]);
 
   // 세트가 없으면 기본세트 생성 또는 세트 있으면 자동선택
-   useEffect(() => {
+  useEffect(() => {
     loadSets();
   }, [loadSets]);
 
   const recentNotices = notices.slice(0, 3);
-    // 선택된 시간표(세트) 이름 찾기
+  // 선택된 시간표(세트) 이름 찾기
   const selectedSetName =
     sets.find((s: any) => s.timetable_list_id === selectedSet)?.name ?? null; // ✅ [추가]
 
@@ -41,7 +40,7 @@ export default function DashboardPage() {
       // 메인 컬러 (Blue)
       bg: "bg-[#016ABF]/5",
       text: "text-[#016ABF]",
-      link: "/library",
+      link: "/campus/timetable",
     },
     {
       name: "학식 메뉴",
@@ -121,22 +120,6 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 4. 도서관 현황 */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] font-bold text-gray-800">도서관 현황</h2>
-            <Link
-              to="/library"
-              className="text-xs text-[#016ABF] font-semibold hover:underline"
-            >
-              상세보기
-            </Link>
-          </div>
-          <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100 overflow-hidden">
-            <LibrarySeatsWidget />
-          </div>
-        </section>
-
         {/* 5. 공지사항 리스트 */}
         <section>
           <div className="flex items-center justify-between mb-3">
@@ -170,6 +153,22 @@ export default function DashboardPage() {
                 </p>
               </div>
             )}
+          </div>
+        </section>
+
+        {/* 4. 도서관 현황 */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[15px] font-bold text-gray-800">도서관 현황</h2>
+            <Link
+              to="/library"
+              className="text-xs text-[#016ABF] font-semibold hover:underline"
+            >
+              상세보기
+            </Link>
+          </div>
+          <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100 overflow-hidden">
+            <LibrarySeatsWidget />
           </div>
         </section>
       </div>

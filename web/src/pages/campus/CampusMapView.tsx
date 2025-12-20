@@ -63,19 +63,19 @@ export default function CampusMapPage() {
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
+    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
       {/* 3. 헤더 영역 (검색창 포함) */}
       <div
         style={{
           backgroundColor: "#0E4A84", // 한양 블루
           color: "#ffffff",
-          padding: "20px 24px",
+          padding: "5px 24px",
           borderRadius: 12,
           marginBottom: 24,
           boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
           display: "flex",
           flexDirection: "column",
-          gap: "10px",
+          gap: "8px",
         }}
       >
         <div
