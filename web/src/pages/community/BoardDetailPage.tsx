@@ -64,7 +64,7 @@ function mapPostItem(post: BoardPostListItem, isFreeBoard: boolean, boardName: s
     topHashtags: post.tags.slice(0, 3).map(tag => `#${tag.name}`),
     hasImage: post.previews.imageUrl !== null,
     imageGray: false,
-    hasPoll: false, // TODO: API 응답에 poll 정보가 있으면 추가
+    hasPoll: post.hasPoll, // false 대신 post.hasPoll 사용
   };
 }
 
@@ -80,21 +80,21 @@ const BoardDetailPage: React.FC = () => {
   const [title, setTitle] = useState('게시판');
   const [bannerText, setBannerText] = useState('게시판 규칙 설명');
 
-  // Determine if this board requires sky blue hashtags
+  // 하늘색 해시태그 갖는 게시판(자유, 동아리, 취업, 단과대) 여부 확인
   const isSkyBlueHashtagBoard = ['club', 'career', 'major'].includes(type || '');
   const isFreeBoard = type === 'free';
   
-  // Boards that should show the right icons (Search, Write)
+  // 검색, 작성 아이콘 표시 게시판(자유, 동아리, 취업, 단과대) 여부 확인
   const isWriteableBoard = ['free', 'club', 'career', 'major'].includes(type || '');
 
-  // Load board ID from board list based on type
+  // 게시판 ID 조회
   useEffect(() => {
     const loadBoardId = async () => {
       try {
         const boardsResponse = await getBoards();
         const boards = boardsResponse.boards;
         
-        // Helper function to get route type from board name (same as BoardListPage)
+        // 게시판 이름으로 게시판 타입 조회
         const getRouteType = (boardName: string): string => {
           if (boardName.includes('나의')) return 'my';
           if (boardName.includes('추천')) return 'recommended';
@@ -107,7 +107,7 @@ const BoardDetailPage: React.FC = () => {
           return 'generic';
         };
 
-        // Find board by matching type
+        // 게시판 타입으로 게시판 조회
         const matchedBoard = boards.find(board => getRouteType(board.name) === type);
         
         if (matchedBoard) {
@@ -115,7 +115,7 @@ const BoardDetailPage: React.FC = () => {
           setTitle(matchedBoard.name);
           setBannerText(`${matchedBoard.name} 규칙 설명`);
         } else {
-          // Fallback: use first board or set error
+          // 게시판 조회 실패 시 에러 설정
           setError('게시판을 찾을 수 없습니다.');
         }
       } catch (err: any) {
@@ -127,7 +127,7 @@ const BoardDetailPage: React.FC = () => {
     loadBoardId();
   }, [type]);
 
-  // Load posts when boardId is available
+  // 게시판 ID 있을 때 게시글 목록 조회
   useEffect(() => {
     if (!boardId) return;
 
@@ -145,7 +145,7 @@ const BoardDetailPage: React.FC = () => {
         const mappedPosts = response.posts.map(post => mapPostItem(post, isFreeBoard, response.boardInfo.name));
         setPosts(mappedPosts);
         
-        // Update title and banner from API response
+        // 게시판 이름과 설명 설정
         setTitle(response.boardInfo.name);
         if (response.boardInfo.description) {
           setBannerText(response.boardInfo.description);
@@ -164,13 +164,13 @@ const BoardDetailPage: React.FC = () => {
     loadPosts();
   }, [boardId, isFreeBoard]);
 
-  // Effect to handle new post creation
+  // 새로운 게시글 생성 시 처리
   useEffect(() => {
     if (location.state?.newPost) {
-      // Transform newPost to PostItem format if needed
+      // 새로운 게시글을 PostItem 형식으로 변환
       const newPostItem = location.state.newPost as PostItem;
       setPosts(prev => [newPostItem, ...prev]);
-      // Clear the state to prevent duplicate additions on navigation
+      // 네비게이션 시 중복 추가 방지를 위해 상태 초기화
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -180,7 +180,7 @@ const BoardDetailPage: React.FC = () => {
   };
 
   const handleWriteClick = () => {
-    // Pass boardType and boardName to CreatePostPage
+    // 게시판 타입과 이름을 CreatePostPage로 전달
     navigate('/community/create', { state: { boardType: type, boardName: title, boardId } });
   };
 
@@ -188,7 +188,7 @@ const BoardDetailPage: React.FC = () => {
 
   return (
     <div className="bg-white min-h-screen font-sans">
-      {/* Header */}
+      {/* 상단헤더 */}
       <header className="flex items-center h-14 px-4 bg-white sticky top-0 z-10">
         <button
           onClick={() => navigate('/community/board-list')}
@@ -197,7 +197,7 @@ const BoardDetailPage: React.FC = () => {
           <ArrowLeft className="w-6 h-6" />
         </button>
         <h1 className="flex-1 text-center text-lg font-bold text-gray-900">{title}</h1>
-        <div className="w-8" /> {/* Spacer for centering if no icons */}
+        <div className="w-8" /> {/* 아이콘 없을 때 중앙 정렬을 위한 여백 */}
         
         {showRightIcons && (
           <div className="absolute right-4 flex items-center gap-3 text-gray-900">
@@ -214,7 +214,7 @@ const BoardDetailPage: React.FC = () => {
         )}
       </header>
 
-      {/* Banner */}
+      {/* 배너 */}
       <div className="px-5 pb-4">
         <div className="bg-gray-100 rounded-lg p-3 flex items-center gap-2 text-gray-600">
             <Info className="w-4 h-4 text-gray-500" />
@@ -222,7 +222,7 @@ const BoardDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Content List */}
+      {/* 게시글 목록 */}
       {loading ? (
         <div className="flex justify-center items-center py-8">
           <span className="text-gray-400 text-sm">게시글을 불러오는 중...</span>
@@ -242,7 +242,7 @@ const BoardDetailPage: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div className="flex-1 pr-4">
                   
-                  {/* Hide top badge for free, club, career, and major boards */}
+                  {/* 자유, 동아리, 취업, 단과대 게시판 제목 위 배지 숨기기 */}
                   {(!isFreeBoard && !isSkyBlueHashtagBoard) && (
                     <div className="flex gap-2 mb-1.5 flex-wrap">
                          <span className="bg-blue-200 text-blue-600 text-[10px] px-2 py-0.5 rounded font-medium">
@@ -275,15 +275,15 @@ const BoardDetailPage: React.FC = () => {
                     <span className="shrink-0">{post.time}</span>
                     <span className="text-gray-300 shrink-0">|</span>
                     
-                    {/* Bottom hashtags */}
+                    {/* 하단 해시태그 */}
                     <div className="flex gap-1 shrink-0">
-                      {(post.topHashtags || post.hashtags || []).map((tag, idx) => (
+                      {(post.hashtags || []).map((tag, idx) => (
                         <span 
                           key={idx} 
                           className={`px-2 py-0.5 rounded-sm shrink-0 ${
                             (isSkyBlueHashtagBoard || isFreeBoard)
-                              ? 'bg-blue-100 text-gray-600' // Sky blue for free/club/career/major
-                              : 'bg-orange-50 text-gray-600' // Default orange/gray for others
+                              ? 'bg-blue-100 text-gray-600' // 하늘색 해시태그 갖는 게시판(자유, 동아리, 취업, 단과대)
+                              : 'bg-orange-50 text-gray-600' // 기본 주황색/회색(동아리, 취업, 단과대)
                           }`}
                         >
                           {tag}
