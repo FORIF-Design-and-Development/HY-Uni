@@ -8,7 +8,7 @@ import { useTimetableStore } from "../store/timetable.store";
 
 export default function DashboardPage() {
   const { notices, fetchNotices } = useNoticeStore();
-  const { sets, selectedSet, loadSets } = useTimetableStore();
+  const { sets, selectedSet, loadSets, loadTimetable, selectedCourses } = useTimetableStore();
 
   useEffect(() => {
     fetchNotices();
@@ -19,10 +19,68 @@ export default function DashboardPage() {
     loadSets();
   }, [loadSets]);
 
+  // 선택된 시간표 세트가 있으면 해당 세트의 시간표 데이터를 불러온다
+  useEffect(() => {
+    if (selectedSet) {
+      loadTimetable(selectedSet);
+    }
+  }, [selectedSet, loadTimetable]);
+
   const recentNotices = notices.slice(0, 3);
-  // 선택된 시간표(세트) 이름 찾기
+  const getSetId = (s: any) =>
+    s?.timetable_list_id ?? s?.timetableListId ?? s?.id ?? s?.set_id ?? null;
+
   const selectedSetName =
-    sets.find((s: any) => s.timetable_list_id === selectedSet)?.name ?? null; // ✅ [추가]
+    sets.find((s: any) => String(getSetId(s)) === String(selectedSet))?.name ??
+    sets.find((s: any) => String(getSetId(s)) === String(selectedSet))?.setName ??
+    sets.find((s: any) => String(getSetId(s)) === String(selectedCourses?.[0]?.timetable_list_id))?.name ??
+    sets.find((s: any) => String(getSetId(s)) === String(selectedCourses?.[0]?.timetable_list_id))?.setName ??
+    null;
+
+
+  // 오늘 요일(월~일) 계산
+  const getTodayKoreanDay = () => {
+    const days = ["일", "월", "화", "수", "목", "금", "토"];
+    return days[new Date().getDay()];
+  };
+
+  // 수업 객체에서 요일 문자열을 최대한 안전하게 뽑는다 (프로젝트마다 필드명이 다를 수 있음)
+  const extractDay = (c: any): string => {
+    return (
+      c?.day ??
+      c?.weekday ??
+      c?.day_of_week ??
+      c?.course_day ??
+      c?.class_day ??
+      ""
+    );
+  };
+
+  const formatTime = (t: any) => {
+    if (typeof t === "string") {
+      if (t.includes(":")) return t.slice(0, 5);
+      return t;
+    }
+    if (typeof t === "number") {
+      return String(t);
+    }
+    return "";
+  };
+
+  const today = getTodayKoreanDay();
+
+  const todayCourses = (Array.isArray(selectedCourses) ? selectedCourses : [])
+    .filter((c: any) => {
+      const d = extractDay(c);
+      // "월" 또는 "월,수" 또는 "월/수" 같은 케이스까지 대충 커버
+      return typeof d === "string" && d.includes(today);
+    })
+    .sort((a: any, b: any) => {
+      // start_time 필드명도 프로젝트마다 달라질 수 있으니 안전하게
+      const aStart = a?.start_time ?? a?.startTime ?? a?.start ?? "";
+      const bStart = b?.start_time ?? b?.startTime ?? b?.start ?? "";
+      return String(aStart).localeCompare(String(bStart));
+    });
 
   // 브랜드 컬러 적용 (Primary: #016ABF, Secondary: #FE7716)
   const quickLinks = [
@@ -90,6 +148,92 @@ export default function DashboardPage() {
         {/* 2. 하이리온 위젯 (배경색 조정 필요시 컴포넌트 내부 수정 권장) */}
         <section className="pt-2">
           <HylionWidget />
+        </section>
+
+        {/* ✅ [추가] 오늘의 수업 */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[15px] font-bold text-gray-800">
+              📚 오늘의 수업 <span className="text-gray-400 font-semibold">({today})</span>
+            </h2>
+            <Link
+              to="/campus/timetable"
+              className="text-xs font-bold text-[#016ABF] bg-[#016ABF]/10 px-3 py-1.5 rounded-full active:bg-[#016ABF]/20 transition-colors"
+            >
+              시간표 보기
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100 overflow-hidden">
+            {/* ✅ [추가] 선택된 세트 이름 표시 */}
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div className="text-xs text-gray-500">
+                선택된 시간표:{" "}
+                <span className="font-semibold text-gray-700">
+                  {selectedSetName ?? "없음"}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400">
+                {todayCourses.length}개
+              </div>
+            </div>
+
+            {todayCourses.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {todayCourses.map((c: any, idx: number) => {
+                  // ✅ [추가] 필드명 다양성을 고려한 안전 추출
+                  const title =
+                    c?.course_name ??
+                    c?.courseName ??
+                    c?.name ??
+                    c?.title ??
+                    "수업";
+                  const location =
+                    c?.location ?? c?.room ?? c?.classroom ?? c?.place ?? "";
+                  const professor =
+                    c?.professor ?? c?.professor_name ?? c?.instructor ?? "";
+
+                  const startRaw = c?.start_time ?? c?.startTime ?? c?.start ?? "";
+                  const endRaw = c?.end_time ?? c?.endTime ?? c?.end ?? "";
+
+                  const start = formatTime(startRaw);
+                  const end = formatTime(endRaw);
+
+                  return (
+                    <div key={c?.course_id ?? c?.courseId ?? `${title}-${idx}`} className="px-4 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold text-gray-900 truncate">
+                            {title}
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500 flex flex-wrap gap-x-2 gap-y-1">
+                            {(start || end) && (
+                              <span className="font-semibold text-gray-700">
+                                {start && end ? `${start} ~ ${end}` : start || end}
+                              </span>
+                            )}
+                            {location && <span>📍 {location}</span>}
+                            {professor && <span>👤 {professor}</span>}
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          <span className="text-[11px] font-bold text-[#016ABF] bg-[#016ABF]/10 px-2.5 py-1 rounded-full">
+                            {today}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center bg-gray-50">
+                <p className="text-xs text-gray-400">
+                  오늘은 등록된 수업이 없습니다.
+                </p>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* 3. 퀵 바로가기 (브랜드 컬러 적용) */}
