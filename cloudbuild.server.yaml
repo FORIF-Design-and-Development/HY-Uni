@@ -6,7 +6,7 @@ steps:
     args:
       [
         'build',
-        '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-server:${COMMIT_SHA}',
+        '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hy-uni-api:${COMMIT_SHA}',
         '-f', 'server/Dockerfile',
         'server'
       ]
@@ -15,7 +15,7 @@ steps:
     args:
       [
         'push',
-        '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hyuni-server:${COMMIT_SHA}'
+        '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/hy-uni-api:${COMMIT_SHA}'
       ]
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
