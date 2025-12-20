@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useTimetableStore } from "../../store/timetable.store";
 import { useNavigate } from "react-router-dom";
 
@@ -76,7 +76,7 @@ function timeToPeriod(time: string | number | null) {
   const [searchProfessor, setSearchProfessor] = useState(filters.professor);
 
   // ✅ debounce 적용
-  useMemo(() => {
+  useEffect(() => {
     const t = setTimeout(() => {
       setFilters("subject", searchSubject);
       setFilters("professor", searchProfessor);
@@ -253,7 +253,11 @@ function timeToPeriod(time: string | number | null) {
 
       {/* 강제 새로고침 */}
       <button
-        onClick={searchCourses}
+        onClick={() => {
+          setFilters("subject", searchSubject);
+          setFilters("professor", searchProfessor);
+          searchCourses();
+        }}
         style={{
           marginBottom: 8,
           padding: "6px 10px",

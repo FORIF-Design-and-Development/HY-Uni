@@ -33,17 +33,20 @@ export const resetTimetable = async (req: Request, res: Response, next: NextFunc
 
 export const addCourseToTimetable = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const setId = Number(req.body.setId);
-    const courseId = Number(req.body.courseId);
-    const day = req.body.day || null;
-    const start = req.body.start != null ? Number(req.body.start) : null;
-    const end = req.body.end != null ? Number(req.body.end) : null;
-
+    const { setId, courseId, day, start, end } = req.body;
+    
     if (!setId || !courseId) {
       return res.status(400).json({ error: "setId and courseId are required" });
     }
 
-    await TimetableModel.addCourseToSet(setId, courseId, day, start, end);
+    await TimetableModel.addCourseToSet(
+    Number(setId), 
+    Number(courseId), 
+    day ?? null, 
+    start ?? null,
+    end ?? null
+  );
+
     res.json({ success: true });
   } catch (err) {
     next(err);

@@ -1,20 +1,16 @@
-import axios from "axios";
+import { api } from "../axios";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-
+  //   시간표 세트 API
 export const timetableAPI = {
-  getSets: () => axios.get(`${API_BASE_URL}/timetablesets`),
-  createSet: (name: string) => axios.post(`${API_BASE_URL}/timetablesets`, { name }),
-  deleteSet: (id: number) => axios.delete(`${API_BASE_URL}/timetablesets/${id}`),
+  getSets: () => api.get("/timetablesets"),
+  createSet: (name: string) => api.post("/timetablesets", { name }),
+  deleteSet: (id: number) => api.delete(`/timetablesets/${id}`),
 
-  getTimetable: (setId: number) =>
-    axios.get(`${API_BASE_URL}/timetable`, { params: { setId } }),
+  //   시간표 (강의 배치)
+  getTimetable: (setId: number) => api.get("/timetable", { params: { setId } }),
+  resetTimetable: (setId: number) => api.delete("/timetable/reset", { params: { setId } }),
+  saveCourse: (data: any) => api.post("/timetable", data),
 
-  resetTimetable: (setId: number) =>
-    axios.delete(`${API_BASE_URL}/timetable/reset`, { params: { setId } }),
-
-  saveCourse: (data: any) => axios.post(`${API_BASE_URL}/timetable`, data),
-
-  searchCourses: (filters: any) =>
-    axios.get(`${API_BASE_URL}/courses`, { params: filters }),
+  //   강의 검색 (course)
+  searchCourses: (filters: any) => api.get("/courses", { params: filters }),
 };
