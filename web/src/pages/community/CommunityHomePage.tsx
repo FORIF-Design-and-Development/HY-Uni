@@ -21,6 +21,35 @@ const CommunityHomePage: React.FC = () => {
     return 'generic';
   };
 
+  // 키워드 하이라이팅 함수
+  const highlightKeywords = (text: string, keywords: string[]): React.ReactNode => {
+    if (!keywords || keywords.length === 0) {
+      return text;
+    }
+
+    // 정규식 특수문자 이스케이프 처리
+    const escapedKeywords = keywords.map(kw => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    
+    // 정규식 패턴 생성 (대소문자 구분 없음)
+    const pattern = new RegExp(`(${escapedKeywords.join('|')})`, 'gi');
+    const parts = text.split(pattern);
+
+    return (
+      <>
+        {parts.map((part, index) => {
+          const isKeyword = keywords.some(kw => part.toLowerCase() === kw.toLowerCase());
+          return isKeyword ? (
+            <mark key={index} className="bg-blue-100 px-0.5 rounded font-medium">
+              {part}
+            </mark>
+          ) : (
+            <span key={index}>{part}</span>
+          );
+        })}
+      </>
+    );
+  };
+
   // 선호 키워드/해시태그 위치 생성
   const generateKeywordPositions = (count: number): Array<{ top: string; left: string }> => {
     const positions = [
@@ -64,6 +93,7 @@ const CommunityHomePage: React.FC = () => {
         time,
         likes: post.likesCount,
         comments: post.commentCount,
+        matchedKeywords: post.recommendationReason?.matchedKeywords || [],
       };
     });
   };
@@ -331,13 +361,21 @@ const CommunityHomePage: React.FC = () => {
                 </div>
                 
                     <div className="mb-2 text-gray-900 text-lg leading-snug">
-                      <div className="font-bold">{post.title}</div>
+                      <div className="font-bold">
+                        {post.matchedKeywords && post.matchedKeywords.length > 0
+                          ? highlightKeywords(post.title, post.matchedKeywords)
+                          : post.title}
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-center text-sm text-gray-500">
                       <div className="flex items-center gap-2 truncate pr-2">
                         {post.contentPreview && (
-                          <span className="truncate">{post.contentPreview}</span>
+                          <span className="truncate">
+                            {post.matchedKeywords && post.matchedKeywords.length > 0
+                              ? highlightKeywords(post.contentPreview, post.matchedKeywords)
+                              : post.contentPreview}
+                          </span>
                         )}
                       </div>
 

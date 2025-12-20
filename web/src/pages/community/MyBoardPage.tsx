@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, MessageCircle, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -73,9 +73,36 @@ const MyBoardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('게시글');
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   const tabs = ['게시글', '댓글', '스크랩', '좋아요'];
+
+  // 무한 스크롤 옵저버
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loading, loadingMore, activeTab]);
 
   // activeTab 변경 시 API 호출
   useEffect(() => {
@@ -88,17 +115,20 @@ const MyBoardPage: React.FC = () => {
 
       setLoading(true);
       setError(null);
+      setCurrentPage(1);
+      setHasMore(true);
 
       try {
         const response = await getBoardPosts({
           boardId,
           page: 1,
-          pageSize: 20,
+          pageSize: 10,
           sortBy: 'latest',
         });
 
         const mappedPosts = response.posts.map(mapPostItem);
         setPosts(mappedPosts);
+        setHasMore(response.pagination.currentPage < response.pagination.totalPages);
       } catch (err: any) {
         console.error('게시글 조회 실패:', err);
         setError(err.response?.data?.error?.message || '게시글을 불러오는 중 오류가 발생했습니다.');
@@ -110,6 +140,33 @@ const MyBoardPage: React.FC = () => {
 
     fetchPosts();
   }, [activeTab]);
+
+  // 추가 게시글 로드
+  const loadMorePosts = async () => {
+    const boardId = boardIdMap[activeTab];
+    if (!boardId || loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const nextPage = currentPage + 1;
+      
+      const response = await getBoardPosts({
+        boardId,
+        page: nextPage,
+        pageSize: 10,
+        sortBy: 'latest',
+      });
+
+      const mappedPosts = response.posts.map(mapPostItem);
+      setPosts(prev => [...prev, ...mappedPosts]);
+      setCurrentPage(nextPage);
+      setHasMore(response.pagination.currentPage < response.pagination.totalPages);
+    } catch (err: any) {
+      console.error('추가 게시글 조회 실패:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handlePostClick = (post: PostItem) => {
     // Navigate with isMyPost flag to enable edit/delete features
@@ -246,6 +303,16 @@ const MyBoardPage: React.FC = () => {
             ))}
           </motion.div>
         </AnimatePresence>
+      </div>
+
+      {/* 무한 스크롤 트리거 */}
+      <div ref={observerTarget} className="h-10 flex justify-center items-center py-4">
+        {loadingMore && (
+          <span className="text-gray-400 text-sm">게시글을 불러오는 중...</span>
+        )}
+        {!hasMore && posts.length > 0 && (
+          <span className="text-gray-400 text-sm">더 이상 게시글이 없습니다.</span>
+        )}
       </div>
     </div>
   );

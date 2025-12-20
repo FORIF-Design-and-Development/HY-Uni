@@ -18,6 +18,7 @@ export interface PostItem {
   likes: number;
   comments: number;
   isHot?: boolean;
+  matchedKeywords?: string[];
 }
 
 export interface FavoriteItem {

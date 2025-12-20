@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, PenSquare, Heart, MessageCircle, Info, Search, BarChart2, Loader2, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -84,9 +84,36 @@ const InternationalBoardPage: React.FC = () => {
   // State 관리
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // 무한 스크롤 옵저버
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !searchQuery.trim()) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loading, loadingMore, activeTab, searchQuery]);
 
   // 탭 변경 시 게시글 로드
   useEffect(() => {
@@ -97,15 +124,19 @@ const InternationalBoardPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+        setCurrentPage(1);
+        setHasMore(true);
+        
         const response = await getBoardPosts({
           boardId,
           page: 1,
-          pageSize: 20,
+          pageSize: 10,
           sortBy: 'latest',
         });
 
         const mappedPosts = response.posts.map(mapPostItem);
         setPosts(mappedPosts);
+        setHasMore(response.pagination.currentPage < response.pagination.totalPages);
       } catch (err: any) {
         setError('게시글을 불러오는데 실패했습니다.');
         console.error('Failed to load posts:', err);
@@ -116,6 +147,33 @@ const InternationalBoardPage: React.FC = () => {
 
     loadPosts();
   }, [activeTab]);
+
+  // 추가 게시글 로드
+  const loadMorePosts = async () => {
+    const boardId = boardIdMap[activeTab];
+    if (!boardId || loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const nextPage = currentPage + 1;
+      
+      const response = await getBoardPosts({
+        boardId,
+        page: nextPage,
+        pageSize: 10,
+        sortBy: 'latest',
+      });
+
+      const mappedPosts = response.posts.map(mapPostItem);
+      setPosts(prev => [...prev, ...mappedPosts]);
+      setCurrentPage(nextPage);
+      setHasMore(response.pagination.currentPage < response.pagination.totalPages);
+    } catch (err: any) {
+      console.error('Failed to load more posts:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // 검색 필터링
   const filteredPosts = searchQuery.trim()
@@ -215,89 +273,103 @@ const InternationalBoardPage: React.FC = () => {
           <span className="text-red-400 text-sm">{error}</span>
         </div>
       ) : (
-        <div className="divide-y divide-gray-100 border-t border-gray-100">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {filteredPosts.length === 0 ? (
-                <div className="flex justify-center items-center py-12">
-                  <span className="text-gray-400 text-sm">
-                    {searchQuery.trim() ? '검색 결과가 없습니다.' : '게시글이 없습니다.'}
-                  </span>
-                </div>
-              ) : (
-                filteredPosts.map(post => (
-                  <div 
-                    key={post.id} 
-                    className="p-5 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => handlePostClick(post.id)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 pr-4">
-                        <h3 className="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
-                          {post.title}
-                          {post.hasPoll && (
-                            <div className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded text-xs text-gray-500 font-medium">
-                              <BarChart2 className="w-3 h-3" />
-                              투표
-                            </div>
-                          )}
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-2">{post.content}</p>
-                        
-                        <div className="flex items-center text-xs text-gray-400 gap-2 flex-wrap">
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <Heart className="w-3.5 h-3.5" />
-                            <span>{post.likes}</span>
-                          </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>{post.comments}</span>
-                          </div>
-                          <span className="text-gray-300 shrink-0">|</span>
-                          <span className="shrink-0">{post.time}</span>
-                          <span className="text-gray-300 shrink-0">|</span>
-                          {/* 해시태그 */}
-                          <div className="flex gap-1 shrink-0">
-                            {post.hashtags && post.hashtags.map((tag, i) => (
-                              <span key={i} className="bg-blue-100 text-gray-600 px-2 py-0.5 rounded-sm">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      {(post.hasImage || post.hasVideo) && (
-                        <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden bg-gray-200">
-                          {post.imageUrl ? (
-                            <img 
-                              src={getAbsoluteUrl(post.imageUrl)} 
-                              alt={post.title}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                console.error('이미지 로드 실패:', post.imageUrl);
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          ) : post.hasVideo ? (
-                            <div className="w-full h-full flex items-center justify-center bg-black">
-                              <Play className="w-8 h-8 text-white" />
-                            </div>
-                          ) : null}
-                        </div>
-                      )}
-                    </div>
+        <>
+          <div className="divide-y divide-gray-100 border-t border-gray-100">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {filteredPosts.length === 0 ? (
+                  <div className="flex justify-center items-center py-12">
+                    <span className="text-gray-400 text-sm">
+                      {searchQuery.trim() ? '검색 결과가 없습니다.' : '게시글이 없습니다.'}
+                    </span>
                   </div>
-                ))
+                ) : (
+                  filteredPosts.map(post => (
+                    <div 
+                      key={post.id} 
+                      className="p-5 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => handlePostClick(post.id)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 pr-4">
+                          <h3 className="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+                            {post.title}
+                            {post.hasPoll && (
+                              <div className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded text-xs text-gray-500 font-medium">
+                                <BarChart2 className="w-3 h-3" />
+                                투표
+                              </div>
+                            )}
+                          </h3>
+                          <p className="text-sm text-gray-500 mb-2">{post.content}</p>
+                          
+                          <div className="flex items-center text-xs text-gray-400 gap-2 flex-wrap">
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <Heart className="w-3.5 h-3.5" />
+                              <span>{post.likes}</span>
+                            </div>
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>{post.comments}</span>
+                            </div>
+                            <span className="text-gray-300 shrink-0">|</span>
+                            <span className="shrink-0">{post.time}</span>
+                            <span className="text-gray-300 shrink-0">|</span>
+                            {/* 해시태그 */}
+                            <div className="flex gap-1 shrink-0">
+                              {post.hashtags && post.hashtags.map((tag, i) => (
+                                <span key={i} className="bg-blue-100 text-gray-600 px-2 py-0.5 rounded-sm">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        {(post.hasImage || post.hasVideo) && (
+                          <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden bg-gray-200">
+                            {post.imageUrl ? (
+                              <img 
+                                src={getAbsoluteUrl(post.imageUrl)} 
+                                alt={post.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  console.error('이미지 로드 실패:', post.imageUrl);
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : post.hasVideo ? (
+                              <div className="w-full h-full flex items-center justify-center bg-black">
+                                <Play className="w-8 h-8 text-white" />
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+          
+          {/* 무한 스크롤 트리거 */}
+          {!searchQuery.trim() && (
+            <div ref={observerTarget} className="h-10 flex justify-center items-center py-4">
+              {loadingMore && (
+                <span className="text-gray-400 text-sm">게시글을 불러오는 중...</span>
               )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+              {!hasMore && filteredPosts.length > 0 && (
+                <span className="text-gray-400 text-sm">더 이상 게시글이 없습니다.</span>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
