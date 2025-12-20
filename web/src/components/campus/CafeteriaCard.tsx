@@ -1,23 +1,26 @@
-import { CafeteriaWithMenus, MealTime } from '../../api/campus/cafeteria.api';
-import { MenuCard } from './MenuCard';
+import { CafeteriaWithMenus, MealTime } from "../../api/campus/cafeteria.api";
+import { MenuCard } from "./MenuCard";
 
 interface CafeteriaCardProps {
   cafeteria: CafeteriaWithMenus;
-  selectedMealTime: MealTime | 'all';
+  selectedMealTime: MealTime | "all";
 }
 
-export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProps) {
+export function CafeteriaCard({
+  cafeteria,
+  selectedMealTime,
+}: CafeteriaCardProps) {
   const renderMeals = () => {
-    if (selectedMealTime === 'all') {
+    if (selectedMealTime === "all") {
       return (
         <>
           {cafeteria.breakfast.length > 0 && (
             <div style={{ marginBottom: 24 }}>
               <h4
                 style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: 600,
-                  color: '#0E4A84',
+                  color: "#0E4A84",
                   marginBottom: 12,
                 }}
               >
@@ -25,8 +28,8 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
               </h4>
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
                   gap: 12,
                 }}
               >
@@ -40,9 +43,9 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
             <div style={{ marginBottom: 24 }}>
               <h4
                 style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: 600,
-                  color: '#0E4A84',
+                  color: "#0E4A84",
                   marginBottom: 12,
                 }}
               >
@@ -50,8 +53,8 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
               </h4>
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
                   gap: 12,
                 }}
               >
@@ -65,9 +68,9 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
             <div style={{ marginBottom: 24 }}>
               <h4
                 style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: 600,
-                  color: '#0E4A84',
+                  color: "#0E4A84",
                   marginBottom: 12,
                 }}
               >
@@ -75,8 +78,8 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
               </h4>
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
                   gap: 12,
                 }}
               >
@@ -95,8 +98,8 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
       return (
         <p
           style={{
-            textAlign: 'center',
-            color: '#898C8E',
+            textAlign: "center",
+            color: "#898C8E",
             padding: 20,
           }}
         >
@@ -108,8 +111,8 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
     return (
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
           gap: 12,
         }}
       >
@@ -123,25 +126,25 @@ export function CafeteriaCard({ cafeteria, selectedMealTime }: CafeteriaCardProp
   return (
     <div
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: "#ffffff",
         borderRadius: 12,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-        overflow: 'hidden',
+        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+        overflow: "hidden",
         marginBottom: 20,
       }}
     >
       <div
         style={{
-          backgroundColor: '#F7F9FA',
-          padding: '16px 20px',
-          borderBottom: '1px solid #ECEFF1',
+          backgroundColor: "#F7F9FA",
+          padding: "16px 20px",
+          borderBottom: "1px solid #ECEFF1",
         }}
       >
         <h3
           style={{
             fontSize: 20,
             fontWeight: 700,
-            color: '#0E4A84',
+            color: "#0E4A84",
             margin: 0,
           }}
         >

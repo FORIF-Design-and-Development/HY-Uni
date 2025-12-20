@@ -16,6 +16,7 @@ import timetableRoutes from "./campus/timetable.routes";
 import timetablesetsRoutes from "./campus/timetablesets.routes";
 import communityRoutes from "./community/community.routes";
 import mapRoutes from "./campus/map.routes";
+import academic_calendarRoutes from "./campus/academic_calendar.routes";
 
 export function registerRoutes(app: Express) {
   //기본 라우트
@@ -40,4 +41,5 @@ export function registerRoutes(app: Express) {
   app.use("/api/reviews", reviewRouter);
   app.use("/api/hylion", hylionRoutes);
   app.use("/api/map", mapRoutes);
+  app.use("/api/academic_calendar", academic_calendarRoutes);
 }

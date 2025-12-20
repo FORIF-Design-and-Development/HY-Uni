@@ -58,6 +58,14 @@ export interface CampusBuilding {
   y: number; // % 좌표
   imageUrl: string | null;
 }
+
+interface CalendarEvent {
+  calendar_id: number;
+  event_title: string;
+  startDate: string; // "2025-11-30T15:00:00.000Z" (UTC)
+  endDate: string;
+}
+
 export const campusApi = {
   // 목록 조회
   getNotices: async (): Promise<Notice[]> => {
