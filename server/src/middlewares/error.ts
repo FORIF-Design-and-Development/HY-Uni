@@ -17,12 +17,12 @@ export function notFound(_req: Request, _res: Response, next: NextFunction) {
 // 전역 에러 핸들러
 export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction) {
   const status = typeof err?.status === 'number' ? err.status : 500;
-  
+
   // 404 에러는 로그를 출력하지 않음 (정적 파일 요청 등 정상적인 경우)
   if (status !== 404) {
     console.error(err);
   }
-  
+
   res.status(status).json({ message: err.message ?? 'Internal Server Error' });
 }
 
@@ -38,11 +38,6 @@ export function requireAuth(
   res: Response,
   next: NextFunction,
 ): void {
-  // TODO: 개발용 임시 하드코딩 - 프로덕션 배포 전 제거 필요
-  (req as any).userId = 14;
-  next();
-  return;
-
   // 쿠키 또는 Authorization 헤더에서 토큰 추출
   const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
 

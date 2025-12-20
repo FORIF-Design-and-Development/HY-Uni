@@ -17,14 +17,11 @@ export async function getHomeData(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // TODO: 개발용 임시 하드코딩 - 프로덕션 배포 전 제거 필요
-    const userId = 14;
+    // req.userId는 requireAuth 미들웨어에서 설정해줌
+    const userId = (req as any).userId;
 
-    // 아래 토큰 검증 코드는 임시로 주석 처리
-    /*
-    // JWT 토큰 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // 혹시라도 userId가 없으면 401 에러 (미들웨어에서 걸러지겠지만 안전 장치)
+    if (!userId) {
       res.status(401).json({
         data: null,
         error: {
@@ -37,29 +34,6 @@ export async function getHomeData(
       });
       return;
     }
-
-    // Bearer 토큰 추출
-    const token = authHeader.substring(7); // 'Bearer ' 제거
-
-    // 토큰 검증 및 user_id 추출
-    let userId: number;
-    try {
-      const payload = verifyAccessToken(token);
-      userId = payload.userId;
-    } catch (error) {
-      res.status(401).json({
-        data: null,
-        error: {
-          message: '유효하지 않은 인증 토큰입니다.',
-          code: 'INVALID_TOKEN',
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-      return;
-    }
-    */
 
     // 1단계: 기본 데이터 조회 (병렬 실행)
     const [unReadNotificationCount, preferredKeywords, preferredTags, filterKeywordsWithId, favoriteBoardsList] = await Promise.all([
