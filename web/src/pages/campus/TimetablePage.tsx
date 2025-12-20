@@ -11,20 +11,20 @@ export default function TimetablePage() {
 
   // ✅ [추가] 리사이즈까지 따라가는 반응형 플래그
   const [isNarrow, setIsNarrow] = useState(() => {
-  if (typeof window === "undefined") return false;
-  return window.innerWidth < 1024;
-});
+    if (typeof window === "undefined") return false;
+    return window.innerWidth < 1024;
+  });
 
-useEffect(() => {
-  // ✅ [추가] 처음 마운트 시에도 한 번 동기화 (모바일/데스크탑 초기 판정)
-  const sync = () => setIsNarrow(window.innerWidth < 1024);
-  sync();
+  useEffect(() => {
+    // ✅ [추가] 처음 마운트 시에도 한 번 동기화 (모바일/데스크탑 초기 판정)
+    const sync = () => setIsNarrow(window.innerWidth < 1024);
+    sync();
 
-  // ✅ [추가] 창 크기 변경 시 반응형 갱신
-  window.addEventListener("resize", sync);
+    // ✅ [추가] 창 크기 변경 시 반응형 갱신
+    window.addEventListener("resize", sync);
 
-  return () => window.removeEventListener("resize", sync);
-}, []);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
 
   // 로그인 안된 경우 UI
   if (!user) {
@@ -79,55 +79,35 @@ useEffect(() => {
     >
       <TimetableHeader />
 
-      {/* ✅ [수정] 반응형: 넓으면 가로 2컬럼 / 좁으면 세로 스택 */}
+      {/* ✅ [수정] 이제 무조건 "상(검색) - 하(시간표)" 구조로 고정 */}
       <div
         style={{
           display: "flex",
           gap: 24,
-          alignItems: "flex-start",
-          // ✅ [추가] 좁은 화면에서 세로 스택으로 변경
-          flexDirection: isNarrow ? "column" : "row",
+          alignItems: "stretch",
+          flexDirection: "column", // ✅ [추가] 무조건 세로 배치
         }}
       >
-        {/* ✅ [추가] 좁은 화면에서는 검색 패널을 먼저 보여주는 편이 UX가 좋음 */}
-        {isNarrow && (
-          <div
-            style={{
-              width: "100%",
-            }}
-          >
-            <CourseSearchPanel />
-          </div>
-        )}
-
-        {/* 시간표 영역: overflow로 Grid를 '가둠' */}
+        {/* ✅ [수정] 검색 패널은 위에 한 번만 렌더링 (중복 제거) */}
         <div
           style={{
-            flex: 1,
-            minWidth: 0,
-            maxWidth: "100%",
+            width: "100%",
+          }}
+        >
+          <CourseSearchPanel />
+        </div>
+
+        {/* ✅ [수정] 시간표 영역: 화면이 작으면 가로 스크롤로 보여주기 */}
+        <div
+          style={{
+            width: "100%",
             overflowX: "auto",
             overflowY: "hidden",
             backgroundColor: "#f5f5f5",
-            // ✅ [추가] 세로 스택일 때는 폭 100%로 고정
-            width: isNarrow ? "100%" : undefined,
           }}
         >
           <TimetableGrid />
         </div>
-
-        {/* ✅ [수정] 넓은 화면에서만 오른쪽 고정 패널 노출 */}
-        {!isNarrow && (
-          <div
-            style={{
-              width: 420,
-              flexShrink: 0,
-              alignSelf: "flex-start",
-            }}
-          >
-            <CourseSearchPanel />
-          </div>
-        )}
       </div>
     </div>
   );
