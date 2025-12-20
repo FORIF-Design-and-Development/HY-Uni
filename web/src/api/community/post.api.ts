@@ -292,7 +292,10 @@ export async function votePostPoll(
 export async function removePostVote(postId: number): Promise<PostVoteResponse> {
   const response = await api.delete<ApiResponse<PostVoteResponse>>(
     `/community/posts/${postId}/vote`
-=======
+  );
+  return response.data.data;
+}
+
 // 첨부파일 타입
 export interface AttachmentItem {
   type: 'IMAGE' | 'VIDEO';
