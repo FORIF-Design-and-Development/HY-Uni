@@ -34,10 +34,15 @@ export const TimetableSetsModel = {
     );
   },
 
-  deleteSet: async (id: number, userId : number): Promise<void> => {
-    await pool.query(
-      "DELETE FROM timetable_list WHERE timetable_list_id = ? AND user_id = ?",
-      [id, userId]
-    );
-  },
+ deleteSet: async (id: number, userId : number): Promise<void> => {
+  await pool.query(
+    "DELETE FROM timetable WHERE timetable_list_id = ?",
+    [id]
+  );
+
+  await pool.query(
+    "DELETE FROM timetable_list WHERE timetable_list_id = ? AND user_id = ?",
+    [id, userId]
+  );
+},
 };

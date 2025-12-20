@@ -1,11 +1,19 @@
 import { useTimetableStore } from "../../store/timetable.store";
 
 export default function TimetableHeader() {
-  const { sets, selectedSet, setSelectedSet, createSet, deleteSet, saveTimetable } =
-    useTimetableStore();
+  const {
+    sets,
+    selectedSet,
+    setSelectedSet,
+    createSetWithPrompt,
+    deleteSet,
+    saveTimetable,
+    loadTimetable,
+  } = useTimetableStore();
 
   const currentSet =
-    sets.find((s) => s.timetable_list_id === selectedSet)?.timetable_name || "시간표 미선택";
+    sets.find((s) => s.timetable_list_id === selectedSet)?.timetable_name ||
+    "시간표 미선택";
 
   return (
     <div
@@ -29,7 +37,17 @@ export default function TimetableHeader() {
       <div style={{ display: "flex", gap: 10 }}>
         <select
           value={selectedSet || ""}
-          onChange={(e) => setSelectedSet(Number(e.target.value))}
+          onChange={async (e) => {
+            // ✅ [추가] 선택한 세트 id
+            const id = Number(e.target.value);
+            if (!id) return;
+
+            // ✅ [추가] store 상태 변경
+            setSelectedSet(id);
+
+            // ✅ [추가] 세트 변경 시 화면에 반영되도록 실제 시간표 로드
+            await loadTimetable(id);
+          }}
           style={{
             padding: "6px 10px",
             borderRadius: 8,
@@ -47,7 +65,7 @@ export default function TimetableHeader() {
         </select>
 
         <button
-          onClick={createSet}
+          onClick={createSetWithPrompt}
           style={{
             padding: "6px 10px",
             borderRadius: 8,
@@ -61,28 +79,27 @@ export default function TimetableHeader() {
           ➕ 세트
         </button>
 
-      <button
-        onClick={() => {
-          if (!selectedSet) return;
+        <button
+          onClick={() => {
+            if (!selectedSet) return;
 
-          const set = sets.find(s => s.timetable_list_id === selectedSet);
-          const name = set?.timetable_name || "선택된 시간표";
+            const setInfo = sets.find((s) => s.timetable_list_id === selectedSet);
+            const name = setInfo?.timetable_name || "선택된 시간표";
 
-          if (!window.confirm(`[${name}]을(를) 삭제하시겠습니까?`)) return;
-          deleteSet();
-        }}
-        style={{
-          padding: "6px 10px",
-          borderRadius: 8,
-          border: "1px solid #ffffff",
-          backgroundColor: "transparent",
-          color: "#ffffff",
-          cursor: "pointer",
-        }}
-      >
-        🗑 삭제
-      </button>
-
+            if (!window.confirm(`[${name}]을(를) 삭제하시겠습니까?`)) return;
+            deleteSet();
+          }}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: "1px solid #ffffff",
+            backgroundColor: "transparent",
+            color: "#ffffff",
+            cursor: "pointer",
+          }}
+        >
+          🗑 삭제
+        </button>
 
         <button
           onClick={saveTimetable}

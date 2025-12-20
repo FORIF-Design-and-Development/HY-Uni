@@ -74,7 +74,7 @@ const AnimatedRoutes = () => {
           <Route path="/campus/timetable" element={<Timetable />} />
           <Route path="/campus/notices" element={<NoticePage />} />
           <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
-          <Route path="/campus/reviews/:courseId" element={<ReviewPage />} />
+          <Route path="/reviews/:courseId" element={<ReviewPage />} />
           <Route path="/hylion" element={<HylionPage />} />
 
           <Route path="/dashboard" element={<DashboardPage />} />

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { TimetableSetsModel } from "../../models/campus/timetablesets.model";
 
-export const getAllSets = async (req, res, next) => {
+export const getAllSets = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).userId;
 
@@ -15,12 +15,10 @@ export const getAllSets = async (req, res, next) => {
     }
 
     return res.json({ success: true, data: rows });
-
   } catch (err) {
     next(err);
   }
 };
-
 
 export const createSet = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -29,7 +27,6 @@ export const createSet = async (req: Request, res: Response, next: NextFunction)
 
     await TimetableSetsModel.createSet(name, userId);
     res.json({ success: true });
-
   } catch (err) {
     next(err);
   }
@@ -42,7 +39,6 @@ export const deleteSet = async (req: Request, res: Response, next: NextFunction)
 
     await TimetableSetsModel.deleteSet(id, userId);
     res.json({ success: true });
-
   } catch (err) {
     next(err);
   }
