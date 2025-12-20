@@ -81,7 +81,7 @@ const AnimatedRoutes = () => {
           <Route path="/test/find-email" element={<FindEmailTest />} />
           <Route path="/test/reset-password" element={<ResetPasswordTest />} />
           <Route path="/chatbot" element={<ChatbotPage />} />
-          <Route path="/timetable" element={<Timetable />} />
+          <Route path="/campus/timetable" element={<Timetable />} />
           <Route path="/campus/notices" element={<NoticePage />} />
           <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
           <Route path="/campus/map" element={<MapPage />} />

@@ -1,16 +1,26 @@
 import { pool } from "../../config/db";
 
 function toMysqlTime(period: string | number | null) {
-  if (!period) return null;
+  if (period === null || period === undefined || period === "") return null;
+
+  // 프론트가 TIME 문자열("09:00:00")로 보내는 경우 그대로 저장
+  if (typeof period === "string" && period.includes(":")) {
+    return period;
+  }
+
+  // 숫자로 들어오는 경우만 변환
   const p = Number(period);
+  if (!Number.isFinite(p)) return null;
+
   const hh = String(p).padStart(2, "0");
   return `${hh}:00:00`;
 }
 
 function fromMysqlTime(time: string | null) {
   if (!time) return null;
-  // MySQL TIME = "11:00:00"
-  return Number(time.split(":")[0]); // 11
+
+  // TIME 문자열 그대로 반환
+  return time;
 }
 
 export interface TimetableEntry {
@@ -68,18 +78,29 @@ export const TimetableModel = {
       [setId]
     );
 
-    // 변환 로직 (MySQL TIME → 교시 숫자)
+    // 변환 로직 (MySQL TIME → 그대로 반환)
     return (rows as any[]).map((r) => {
       if (r.custom_schedule_id) {
         return {
           t_id: r.t_id,
           course_id: null,
-          is_custom: true,
-          title: r.custom_title,
-          location: r.custom_location,
           day: r.custom_day,
           start_time: fromMysqlTime(r.custom_start),
           end_time: fromMysqlTime(r.custom_end),
+
+          // ✅ [추가] TimetableEntry가 요구하는 필드들을 null로 채움
+          course_name: null,
+          professor: null,
+          location: r.custom_location,   // 커스텀 장소는 location에 매핑
+          credit: null,
+          major_division: null,
+          grade: null,
+
+          // ✅ [추가] 인터페이스에 선언된 custom 필드 채움
+          custom_title: r.custom_title,
+          custom_location: r.custom_location,
+
+          is_custom: true,
         };
       }
 
@@ -95,28 +116,21 @@ export const TimetableModel = {
         day: r.day,
         start_time: fromMysqlTime(r.start_time),
         end_time: fromMysqlTime(r.end_time),
+
+        // ✅ [추가] 일반 강의는 custom 필드 null
+        custom_title: null,
+        custom_location: null,
+
         is_custom: false,
       };
     });
-  },
 
+  },
 
   // 세트 전체 삭제
   deleteTimetableBySet: async (setId: number): Promise<void> => {
     await pool.query("DELETE FROM timetable WHERE timetable_list_id = ?", [setId]);
   },
-
-//   // 커스텀 강의 추가
-//   addCustomToTimetable: async (setId, customScheduleId, day, start, end) => {
-//   await pool.query(
-//     `
-//     INSERT INTO timetable (timetable_list_id, custom_schedule_id, course_id)
-//     VALUES (?, ?, NULL)
-//     `,
-//     [setId, customScheduleId]
-//   );
-// },
-
 
   // 강의 추가
   addCourseToSet: async (
@@ -130,7 +144,6 @@ export const TimetableModel = {
       `
         INSERT INTO timetable (timetable_list_id, course_id, day, start_time, end_time)
         VALUES (?, ?, ?, ?, ?)
-
       `,
       [setId, courseId, day, toMysqlTime(start), toMysqlTime(end)]
     );

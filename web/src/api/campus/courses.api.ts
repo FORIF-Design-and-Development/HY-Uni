@@ -1,4 +1,4 @@
-import axios from "axios";
+import { api } from "../axios"; 
 
 export async function getCourses(params: {
   subject?: string;
@@ -8,6 +8,7 @@ export async function getCourses(params: {
   day?: string;
   sort?: string;
 }) {
-  const res = await axios.get("/api/courses", { params });
+
+  const res = await api.get("/courses", { params });
   return res.data;
 }

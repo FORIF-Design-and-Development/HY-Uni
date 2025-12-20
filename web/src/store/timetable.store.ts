@@ -26,6 +26,9 @@ interface TimetableState {
   createSet: (name: string) => Promise<void>;
   deleteSet: () => Promise<void>;
 
+  // ✅ [추가] store에 구현되어 있는데 interface에 없어서 TS 에러 발생 → 선언 추가
+  createSetWithPrompt: () => Promise<void>;
+
   loadTimetable: (setId: number) => Promise<void>;
   searchCourses: () => Promise<void>;
 
@@ -38,6 +41,31 @@ interface TimetableState {
   setFilters: (name: string, value: string) => void;
   setSelectedSet: (id: number) => void;
 }
+
+// ✅ [추가] timeToSlot을 여러 곳에서 재사용하려고 store 밖에 헬퍼로 분리
+// - 교시 숫자(1, 2.5 등) 또는 TIME 문자열("09:00:00")을 30분 슬롯(0~)으로 통일
+const timeToSlot = (periodOrTime: number | string | null) => {
+  if (periodOrTime == null) return null;
+
+  if (typeof periodOrTime === "number") {
+    if (isNaN(periodOrTime)) return null;
+    return Math.round((periodOrTime - 1) * 2);
+  }
+
+  if (typeof periodOrTime === "string") {
+    if (periodOrTime === "-" || periodOrTime.trim() === "") return null;
+    if (!periodOrTime.includes(":")) return null;
+
+    const [hStr, mStr] = periodOrTime.split(":");
+    const h = Number(hStr);
+    const m = Number(mStr);
+    if (isNaN(h) || isNaN(m)) return null;
+
+    return (h - 9) * 2 + (m >= 30 ? 1 : 0);
+  }
+
+  return null;
+};
 
 export const useTimetableStore = create<TimetableState>((set, get) => ({
   sets: [],
@@ -93,7 +121,6 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
     }
   },
 
-
   createSet: async (name: string) => {
     await timetableAPI.createSet(name);
     await get().loadSets();
@@ -123,87 +150,88 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
 
     console.log("🔹 raw from API", raw);
 
-    const normalized = raw.map((r) => {
-    const normalize = (v: any) => {
-      if (v === null || v === undefined) return null;
-      if (typeof v === "number") return v;
-      if (typeof v === "string") return Number(v);
-      return null;
-    };
+    const normalized = raw.map((r: any) => {
+      // ✅ [추가] 값 정규화 함수 (null/undefined/빈값 처리 + TIME 문자열 유지)
+      const normalize = (v: any) => {
+        if (v === null || v === undefined) return null;
+        if (typeof v === "number") return v;
 
-    // 커스텀
-    if (r.custom_schedule_id) {
-      return {
-        id: r.custom_schedule_id,
-        course_id: null,
-        title: r.custom_title,
-        day: r.custom_day,
-        start_time: normalize(r.custom_start),
-        end_time: normalize(r.custom_end),
-        location: r.custom_location,
-        is_custom: true,
+        // ✅ [추가] TIME 문자열("09:00:00")은 Number로 바꾸면 NaN이니까 그대로 유지
+        if (typeof v === "string") {
+          if (v === "-" || v.trim() === "") return null;
+          if (v.includes(":")) return v; // ✅ TIME 문자열 유지
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        }
+
+        return null;
       };
-    }
 
-    // 정규
-    return {
-      id: r.course_id,
-      course_id: r.course_id,
-      course_name: r.course_name,
-      professor: r.professor,
-      location: r.location,
-      credit: r.credit,
-      major_division: r.major_division,
-      grade: r.required_grade,
-      day: r.day,
-      start_time: normalize(r.start_time),
-      end_time: normalize(r.end_time),
-      is_custom: false,
-    };
-  });
+      // 커스텀
+      if (r.custom_schedule_id) {
+        return {
+          id: r.custom_schedule_id,
+          course_id: null,
+          title: r.custom_title,
+          day: r.custom_day,
+          start_time: normalize(r.custom_start),
+          end_time: normalize(r.custom_end),
+          location: r.custom_location,
+          is_custom: true,
+        };
+      }
 
-    const complete = normalized.filter(
-      (c) =>
-        c.day &&
-        c.start_time != null &&
-        c.end_time != null &&
-        !isNaN(Number(c.start_time)) &&
-        !isNaN(Number(c.end_time))
-    );
+      // 정규
+      return {
+        id: r.course_id,
+        course_id: r.course_id,
+        course_name: r.course_name,
+        professor: r.professor,
+        location: r.location,
+        credit: r.credit,
+        major_division: r.major_division,
+        grade: r.required_grade,
+        day: r.day,
+        start_time: normalize(r.start_time),
+        end_time: normalize(r.end_time),
+        is_custom: false,
+      };
+    });
 
-    const incomplete = normalized.filter(
-      (c) =>
-        !c.day ||
-        c.start_time == null ||
-        c.end_time == null ||
-        c.start_time === "-" ||
-        c.end_time === "-"
-    );
+    const complete = normalized.filter((c: any) => {
+      const s = timeToSlot(c.start_time);
+      const e = timeToSlot(c.end_time);
 
-    console.log("🔹 complete", complete);
-    console.log("🔹 incomplete", incomplete);
+      return c.day && c.day !== "-" && s != null && e != null && e > s;
+    });
 
+    const incomplete = normalized.filter((c: any) => {
+      const s = timeToSlot(c.start_time);
+      const e = timeToSlot(c.end_time);
+
+      return !c.day || c.day === "-" || s == null || e == null || e <= s;
+    });
+
+    // ✅ [추가] loadTimetable 결과를 state에 반영해야 화면이 갱신됨
     set({
-      selectedCourses: complete,
+      selectedSet: setId, // ✅ [추가] 현재 로드한 세트로 동기화
+      selectedCourses: mergeByCourseAndDay(complete), // ✅ [추가] 연속 시간 병합
       incompleteCourses: incomplete,
     });
   },
 
-
   // ==================== 검색 ====================
-    searchCourses: async () => {
+  searchCourses: async () => {
     const filters = get().filters;
     const res = await timetableAPI.searchCourses(filters);
     set({ courses: res.data.data });
   },
-
 
   // ==================== 추가/삭제 ====================
   addCourse: (course) => {
     if (!course.day || !course.start_time) {
       set((state) => ({
         incompleteCourses: [...state.incompleteCourses, course],
-        selectedCourses: [...state.selectedCourses, course],
       }));
       return;
     }
@@ -215,15 +243,23 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
 
   removeCourse: (course_id, day, start, end) =>
     set((state) => ({
-      selectedCourses: state.selectedCourses.filter(
-        (c) =>
-          !(
-            c.course_id === course_id &&
-            c.day === day &&
-            Number(c.start_time) >= Number(start) &&
-            Number(c.end_time) <= Number(end)
-          )
-      ),
+      selectedCourses: state.selectedCourses.filter((c) => {
+        // ✅ [추가] start/end/c.start_time/c.end_time이 TIME 문자열이어도 삭제가 되도록 슬롯 비교
+        const cStart = timeToSlot(c.start_time);
+        const cEnd = timeToSlot(c.end_time);
+        const startSlot = timeToSlot(start as any);
+        const endSlot = timeToSlot(end as any);
+
+        // ✅ [추가] 변환 실패 시 안전하게 삭제 대상에서 제외(= 남김)
+        if (cStart == null || cEnd == null || startSlot == null || endSlot == null) return true;
+
+        return !(
+          c.course_id === course_id &&
+          c.day === day &&
+          cStart >= startSlot &&
+          cEnd <= endSlot
+        );
+      }),
     })),
 
   removeIncomplete: (idx) => {
@@ -242,7 +278,7 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
     const all = [...get().selectedCourses, ...get().incompleteCourses];
 
     // course_id 없는 강의 제외
-    const valid = all.filter(c => c.course_id);
+    const valid = all.filter((c) => c.course_id);
 
     for (const c of valid) {
       await timetableAPI.saveCourse({
@@ -253,7 +289,6 @@ export const useTimetableStore = create<TimetableState>((set, get) => ({
         end: c.end_time ?? null,
       });
     }
-
 
     window.alert("시간표 저장 완료!");
   },
@@ -273,14 +308,13 @@ const DAY_ORDER: Record<string, number> = { 월: 1, 화: 2, 수: 3, 목: 4, 금:
 function mergeByCourseAndDay(rows: any[]): any[] {
   if (!rows || rows.length === 0) return [];
   const sorted = [...rows].sort((a, b) => {
-    if (a.course_name !== b.course_name)
-      return a.course_name.localeCompare(b.course_name);
-    if (a.professor !== b.professor)
-      return a.professor.localeCompare(b.professor);
-    if (a.day !== b.day)
-      return (DAY_ORDER[a.day] || 99) - (DAY_ORDER[b.day] || 99);
-    return Number(a.start_time) - Number(b.start_time);
-  }); 
+    if (a.course_name !== b.course_name) return a.course_name.localeCompare(b.course_name);
+    if (a.professor !== b.professor) return a.professor.localeCompare(b.professor);
+    if (a.day !== b.day) return (DAY_ORDER[a.day] || 99) - (DAY_ORDER[b.day] || 99);
+
+    // ✅ [수정] Number()는 TIME 문자열에서 NaN → 슬롯 기반 정렬로 변경
+    return (timeToSlot(a.start_time) ?? 9999) - (timeToSlot(b.start_time) ?? 9999);
+  });
 
   const merged: any[] = [];
   let cur: any = null;
@@ -291,7 +325,8 @@ function mergeByCourseAndDay(rows: any[]): any[] {
       cur.course_name === r.course_name &&
       cur.professor === r.professor &&
       cur.day === r.day &&
-      Number(cur.end_time) === Number(r.start_time)
+      // ✅ [수정] Number()는 TIME 문자열에서 NaN → 슬롯 비교로 변경
+      (timeToSlot(cur.end_time) ?? -1) === (timeToSlot(r.start_time) ?? -2)
     ) {
       cur.end_time = r.end_time;
     } else {

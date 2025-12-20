@@ -106,15 +106,26 @@ import { HylionWidget } from "../components/campus/HylionWidget";
 import { LibrarySeatsWidget } from "../components/campus/LibrarySeatsWidget";
 import NoticeCard from "../components/campus/NoticeCard";
 import { useNoticeStore } from "../store/useNoticeStore";
+import { useTimetableStore } from "../store/timetable.store";
+
 
 export default function DashboardPage() {
   const { notices, fetchNotices } = useNoticeStore();
+  const { sets, selectedSet, loadSets } = useTimetableStore();
 
   useEffect(() => {
     fetchNotices();
   }, [fetchNotices]);
 
+  // 세트가 없으면 기본세트 생성 또는 세트 있으면 자동선택
+   useEffect(() => {
+    loadSets();
+  }, [loadSets]);
+
   const recentNotices = notices.slice(0, 3);
+    // 선택된 시간표(세트) 이름 찾기
+  const selectedSetName =
+    sets.find((s: any) => s.timetable_list_id === selectedSet)?.name ?? null; // ✅ [추가]
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -163,7 +174,38 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* 3. 최신 공지사항 */}
+      {/*  3. 시간표 요약  */}
+      <section className="mb-10">
+        <div className="bg-white rounded-2xl border shadow-sm p-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">🗓️ 시간표</h2>
+
+            {/*  선택된 시간표 이름 표시 */}
+            {selectedSet ? (
+              <p className="text-sm text-gray-600 mt-1">
+                선택된 시간표:{" "}
+                <span className="font-semibold text-gray-800">
+                  {selectedSetName ?? "이름 없음"}
+                </span>
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600 mt-1">
+                선택된 시간표가 없습니다.
+              </p>
+            )}
+          </div>
+
+          {/* 시간표 페이지로 이동 버튼 */}
+          <Link
+            to="/campus/timetable"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition"
+          >
+            시간표 보러가기
+          </Link>
+        </div>
+      </section>
+
+      {/* 4. 최신 공지사항 */}
       <section>
         <div className="flex justify-between items-end mb-4">
           <h2 className="text-xl font-bold text-gray-800">📢 최신 공지사항</h2>
