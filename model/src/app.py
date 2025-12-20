@@ -20,7 +20,13 @@ app = FastAPI(
 )
 
 # 서버 전체에서 공유할 ChatSession (하나만 생성해서 재사용)
-session = ChatSession()
+_session: Optional[ChatSession] = None
+
+def get_session() -> ChatSession:
+    global _session
+    if _session is None:
+        _session = ChatSession()
+    return _session
 
 
 # 1) 요청 스키마
@@ -43,10 +49,7 @@ def health_check():
 # 4) 실제 채팅 엔드포인트
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    """
-    한양대 학사관리 챗봇 파이프라인을 한 번 실행하는 HTTP 엔드포인트
-    """
-    # 기존 CLI에서 하던 것과 거의 동일한 호출
+    session = get_session()
     result: Dict[str, Any] = session.ask(
         question=req.question,
         k=5,
@@ -55,5 +58,4 @@ def chat(req: ChatRequest):
 
     answer = result.get("answer", "")
     meta = {k: v for k, v in result.items() if k != "answer"}
-
     return ChatResponse(answer=answer, meta=meta)
