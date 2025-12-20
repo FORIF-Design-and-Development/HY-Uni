@@ -49,6 +49,14 @@ export interface BoardWithTags {
   availableTags: Array<{ id: number; name: string }>;
 }
 
+// 모든 게시판 태그와 선호 태그 조회 결과 형태
+export interface BoardWithTagsAndPreferences {
+  boardId: number;
+  boardName: string;
+  availableTags: Array<{ id: number; name: string }>;
+  preferredTags: Array<{ id: number; name: string }>;
+}
+
 // 사용자와 게시판별 선호 태그 목록을 조회하는 함수
 // user_preference_tag와 board_tag를 JOIN하여 특정 게시판마다 사용자의 선호 태그만 필터링
 export async function findPreferredTagsByUserIdAndBoardId(
@@ -344,5 +352,99 @@ export async function findAllBoardsWithTags(): Promise<BoardWithTags[]> {
 
   // board_id 순서로 정렬하여 반환
   return Array.from(boardMap.values()).sort((a, b) => a.boardId - b.boardId);
+}
+
+// 모든 게시판의 태그와 사용자의 선호 태그를 한 번에 조회하는 함수
+// - 최상위 게시판: 자신의 태그 반환
+// - 하위 게시판: 부모 게시판의 태그 반환 (응답의 boardId는 부모 게시판 ID)
+export async function findAllBoardsWithTagsAndPreferences(
+  userId: number,
+): Promise<BoardWithTagsAndPreferences[]> {
+  // 모든 게시판과 태그, 선호 태그를 한 번에 조회
+  // 하위 게시판의 경우 parent_board_id를 사용하여 부모 게시판의 태그를 조회
+  const sql = `
+    SELECT
+      b.board_id,
+      b.name as board_name,
+      b.parent_board_id,
+      COALESCE(b.parent_board_id, b.board_id) as target_board_id,
+      COALESCE(p.name, b.name) as response_board_name,
+      t.tag_id,
+      t.name as tag_name,
+      CASE WHEN upt.user_id IS NOT NULL THEN 1 ELSE 0 END as is_preferred
+    FROM ${BOARDS_TABLE} b
+    LEFT JOIN ${BOARDS_TABLE} p 
+      ON b.parent_board_id = p.board_id
+    LEFT JOIN ${BOARD_TAG_TABLE} bt 
+      ON bt.board_id = COALESCE(b.parent_board_id, b.board_id)
+    LEFT JOIN ${TAGS_TABLE} t 
+      ON t.tag_id = bt.tag_id
+    LEFT JOIN ${USER_PREFERENCE_TAG_TABLE} upt 
+      ON upt.tag_id = t.tag_id AND upt.user_id = ?
+    WHERE t.tag_id IS NOT NULL
+    ORDER BY b.board_id ASC, t.tag_id ASC
+  `;
+
+  interface BoardWithTagsAndPreferencesRow extends BoardWithTagsRow {
+    is_preferred: number;
+  }
+
+  const [rows] = await pool.query<BoardWithTagsAndPreferencesRow[]>(sql, [userId]);
+
+  // 게시판별로 그룹화
+  const boardMap = new Map<number, {
+    boardId: number;
+    boardName: string;
+    availableTags: Map<number, { id: number; name: string }>;
+    preferredTags: Array<{ id: number; name: string }>;
+  }>();
+
+  for (const row of rows) {
+    // 하위 게시판의 경우 부모 게시판 ID를 사용, 최상위 게시판은 자신의 ID 사용
+    const responseBoardId = row.parent_board_id ?? row.board_id;
+    // 하위 게시판의 경우 부모 게시판 이름 사용, 최상위 게시판은 자신의 이름 사용
+    const responseBoardName = row.response_board_name;
+
+    // 이미 존재하는 게시판인지 확인
+    if (!boardMap.has(responseBoardId)) {
+      boardMap.set(responseBoardId, {
+        boardId: responseBoardId,
+        boardName: responseBoardName,
+        availableTags: new Map(),
+        preferredTags: [],
+      });
+    }
+
+    const board = boardMap.get(responseBoardId)!;
+
+    // 사용 가능한 태그 추가 (중복 방지)
+    if (row.tag_id !== null && row.tag_name !== null) {
+      if (!board.availableTags.has(row.tag_id)) {
+        board.availableTags.set(row.tag_id, {
+          id: row.tag_id,
+          name: row.tag_name,
+        });
+      }
+
+      // 선호 태그 추가
+      if (row.is_preferred === 1) {
+        const existingPreferred = board.preferredTags.find(t => t.id === row.tag_id);
+        if (!existingPreferred) {
+          board.preferredTags.push({
+            id: row.tag_id,
+            name: row.tag_name,
+          });
+        }
+      }
+    }
+  }
+
+  // Map을 Array로 변환하고 board_id 순서로 정렬하여 반환
+  return Array.from(boardMap.values()).map(board => ({
+    boardId: board.boardId,
+    boardName: board.boardName,
+    availableTags: Array.from(board.availableTags.values()),
+    preferredTags: board.preferredTags,
+  })).sort((a, b) => a.boardId - b.boardId);
 }
 

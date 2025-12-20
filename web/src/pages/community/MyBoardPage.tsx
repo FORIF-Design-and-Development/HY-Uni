@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Heart, MessageCircle, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getBoardPosts, BoardPostListItem } from '../../api/community/post.api';
+import { getAbsoluteUrl } from '../../utils/url';
+import { toKST, getNowKST } from '../../utils/date';
 
 // 탭별 boardId 매핑
 const boardIdMap: Record<string, number> = {
@@ -24,12 +26,14 @@ interface PostItem {
   hashtags: string[];
   hasImage: boolean;
   imageUrl: string | null;
+  hasVideo: boolean;
+  videoUrl: string | null;
 }
 
-// 상대 시간 포맷팅 함수
+// 상대 시간 포맷팅 함수 (한국 시간 기준)
 function formatRelativeTime(dateString: string): string {
-  const now = new Date();
-  const date = new Date(dateString);
+  const now = getNowKST();
+  const date = toKST(dateString);
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
@@ -59,6 +63,8 @@ function mapPostItem(post: BoardPostListItem): PostItem {
     hashtags: post.tags.map(tag => `#${tag.name}`),
     hasImage: post.previews.imageUrl !== null,
     imageUrl: post.previews.imageUrl,
+    hasVideo: post.previews.videoUrl !== null,
+    videoUrl: post.previews.videoUrl,
   };
 }
 
@@ -216,12 +222,24 @@ const MyBoardPage: React.FC = () => {
                     </div>
                   </div>
                   
-                  {post.hasImage && post.imageUrl && (
-                    <img 
-                      src={post.imageUrl} 
-                      alt={post.title}
-                      className="w-16 h-16 object-cover rounded-lg shrink-0"
-                    />
+                  {(post.hasImage || post.hasVideo) && (
+                    <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden bg-gray-200">
+                      {post.imageUrl ? (
+                        <img 
+                          src={getAbsoluteUrl(post.imageUrl)} 
+                          alt={post.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.error('이미지 로드 실패:', post.imageUrl);
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : post.hasVideo ? (
+                        <div className="w-full h-full flex items-center justify-center bg-black">
+                          <Play className="w-8 h-8 text-white" />
+                        </div>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </div>

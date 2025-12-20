@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, X, ChevronDown, Heart, MessageCircle } from 'lucide-react';
+import { getAbsoluteUrl } from '../../utils/url';
 
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
@@ -45,6 +46,7 @@ const SearchPage: React.FC = () => {
       time: '11:30',
       hashtags: ['#해시태그', '#해시태그'],
       hasImage: true,
+      imageUrl: null, // 실제 API 연동 시 post.previews.imageUrl 사용
     },
     {
       id: 2,
@@ -56,6 +58,7 @@ const SearchPage: React.FC = () => {
       time: '10:05',
       hashtags: [],
       hasImage: false,
+      imageUrl: null,
     },
     {
       id: 3,
@@ -67,6 +70,7 @@ const SearchPage: React.FC = () => {
       time: '06:48',
       hashtags: ['#해시태그'],
       hasImage: false,
+      imageUrl: null,
     },
     {
       id: 4,
@@ -78,6 +82,7 @@ const SearchPage: React.FC = () => {
       time: '3년 전',
       hashtags: ['#해시태그', '#해시태그'],
       hasImage: false,
+      imageUrl: null,
     },
     {
       id: 5,
@@ -89,6 +94,7 @@ const SearchPage: React.FC = () => {
       time: '3년 전',
       hashtags: ['#해시태그', '#해시태그'],
       hasImage: false,
+      imageUrl: null,
     },
   ];
 
@@ -283,7 +289,18 @@ const SearchPage: React.FC = () => {
                     </div>
                     
                     {/* Image Thumbnail */}
-                    {post.hasImage && (
+                    {post.hasImage && post.imageUrl && (
+                      <img 
+                        src={getAbsoluteUrl(post.imageUrl)} 
+                        alt={post.title}
+                        className="w-16 h-16 object-cover rounded-lg shrink-0"
+                        onError={(e) => {
+                          console.error('이미지 로드 실패:', post.imageUrl);
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    )}
+                    {post.hasImage && !post.imageUrl && (
                       <div className="w-16 h-16 bg-gray-200 rounded-lg shrink-0" />
                     )}
                   </div>

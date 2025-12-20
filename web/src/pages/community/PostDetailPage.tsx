@@ -3,6 +3,8 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, AlertTriangle, User, Heart, MessageCircle, Bookmark, XSquare, CornerDownRight, Send, Check, EyeOff, X, LayoutGrid, Trash2, PenLine, MoreHorizontal, BarChart2, Loader2, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { getPostDetail, togglePostReaction, togglePostScrap, deletePost, votePostPoll, removePostVote, type PostDetailResponse } from '../../api/community/post.api';
 import { createComment, createReply, updateComment, deleteComment, toggleCommentReaction } from '../../api/community/comment.api';
+import { getAbsoluteUrl } from '../../utils/url';
+import { toKST, getNowKST } from '../../utils/date';
 
 interface Comment {
   id: number;
@@ -19,10 +21,10 @@ interface Comment {
   isEdited?: boolean;
 }
 
-// 날짜 포맷팅 함수
+// 날짜 포맷팅 함수 (한국 시간 기준)
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
+  const date = toKST(dateString);
+  const now = getNowKST();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
@@ -46,11 +48,18 @@ function flattenComments(comments: PostDetailResponse['comments']): Comment[] {
   let anonymousCounter = 0;
   
   const processComment = (comment: PostDetailResponse['comments'][0], isReply: boolean) => {
-    const authorName = comment.author.isPostAuthor 
-      ? '글쓴이' 
-      : comment.author.nickname === '익명' 
-        ? `익명${++anonymousCounter}` 
-        : comment.author.nickname;
+    // 원래 닉네임 결정
+    let baseAuthorName: string;
+    if (comment.author.isPostAuthor) {
+      baseAuthorName = '글쓴이';
+    } else if (comment.author.nickname === '익명') {
+      baseAuthorName = `익명${++anonymousCounter}`;
+    } else {
+      baseAuthorName = comment.author.nickname;
+    }
+    
+    // 내 댓글인 경우 뒤에 '(나)' 붙이기
+    const authorName = comment.author.isMine ? `${baseAuthorName} (나)` : baseAuthorName;
     
     result.push({
       id: comment.id,
@@ -805,15 +814,28 @@ const PostDetailPage: React.FC = () => {
   const handleEditPost = () => {
       if (!postDetail) return;
       setShowMenu(false);
+      
+      // attachments를 AttachmentItem[] 형식으로 변환
+      const attachments = [
+        ...postDetail.attachments.images.map(img => ({ type: 'IMAGE' as const, url: img.url })),
+        ...postDetail.attachments.videos.map(vid => ({ type: 'VIDEO' as const, url: vid.url }))
+      ];
+      
+      // 태그 ID 배열 추출
+      const tagIds = postDetail.tags.map(tag => tag.id);
+      
       navigate(`/community/post/${id}/edit`, {
           state: {
               initialData: {
                   title: postDetail.title,
-                  content: postDetail.content
+                  content: postDetail.content,
+                  attachments: attachments,
+                  tagIds: tagIds
               },
               isMyPost: postDetail.author.isMine,
               boardName: postDetail.board.name,
-              boardType: boardType
+              boardType: boardType,
+              boardId: postDetail.board.id
           }
       });
   };
@@ -1012,16 +1034,23 @@ const PostDetailPage: React.FC = () => {
                     <div key={idx} className="min-w-full h-full relative flex items-center justify-center bg-black">
                       {media.type === 'image' ? (
                         <img 
-                          src={media.url} 
+                          src={getAbsoluteUrl(media.url)} 
                           alt={`게시글 이미지 ${idx + 1}`}
                           className="w-full h-full object-contain"
+                          onError={(e) => {
+                            console.error('이미지 로드 실패:', media.url);
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
                         />
                       ) : (
                         <div className="relative w-full h-full">
                           <video 
-                            src={media.url}
+                            src={getAbsoluteUrl(media.url)}
                             className="w-full h-full object-contain"
                             controls
+                            onError={() => {
+                              console.error('동영상 로드 실패:', media.url);
+                            }}
                           />
                           <div className="absolute top-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
                             <Play className="w-3 h-3" />
@@ -1221,7 +1250,7 @@ const PostDetailPage: React.FC = () => {
                         <User className="w-5 h-5 text-gray-400" />
                     </div>
                   )}
-                  <span className={`text-sm font-bold ${comment.isAuthor ? 'text-blue-500' : comment.author === '나' ? 'text-blue-500' : 'text-gray-900'}`}>
+                  <span className={`text-sm font-bold ${comment.isAuthor ? 'text-blue-500' : comment.author.includes('(나)') ? 'text-blue-500' : 'text-gray-900'}`}>
                     {comment.author}
                   </span>
                 </div>
@@ -1250,7 +1279,7 @@ const PostDetailPage: React.FC = () => {
                         )}
 
                         {/* If it's my comment, show Edit/Delete Menu, otherwise show Report */}
-                        {comment.author === '나' ? (
+                        {comment.author.includes('(나)') ? (
                              <div className="relative">
                                 <button 
                                     onClick={(e) => openCommentMenu(e, comment.id)}

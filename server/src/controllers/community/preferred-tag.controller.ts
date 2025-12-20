@@ -8,6 +8,7 @@ import {
   addPreferredTags,
   deletePreferredTags,
   findTagsByBoardId,
+  findAllBoardsWithTagsAndPreferences,
 } from '../../models/community/preferred-tag.model';
 
 // 선호 태그 추가 요청 본문(바디) 데이터 필드 정의
@@ -490,6 +491,59 @@ export async function getBoardTagsHandler(
       },
     });
   } catch (error) {
+    next(error);
+  }
+}
+
+// 모든 게시판의 태그와 선호 태그를 한 번에 조회
+// - 모든 게시판(최상위 + 하위)의 태그와 사용자의 선호 태그를 게시판별로 그룹화하여 반환
+export async function getAllBoardsTagsWithPreferencesHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = (req as any).userId;
+
+    if (!userId) {
+      res.status(401).json({
+        data: null,
+        error: {
+          message: '인증이 필요합니다.',
+          code: 'UNAUTHORIZED',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 모든 게시판의 태그와 선호 태그 조회
+    const boards = await findAllBoardsWithTagsAndPreferences(userId);
+
+    // 성공 응답
+    res.status(200).json({
+      data: {
+        boards,
+      },
+      error: null,
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    // 서버 오류 처리
+    res.status(500).json({
+      data: null,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: '서버 오류가 발생했습니다.',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
     next(error);
   }
 }
