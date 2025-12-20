@@ -42,6 +42,7 @@ import PostDetailPage from "./pages/community/PostDetailPage";
 import SearchPage from "./pages/community/SearchPage";
 import SettingsPage from "./pages/community/SettingsPage";
 import AcademicCalendarPage from "./pages/campus/AcademicCalendarPage.tsx";
+import { FloatingChatbot } from "./components/common/FloatingChatbot";
 
 // --- Components ---
 
@@ -139,6 +140,7 @@ export default function App() {
           <Link to="/dashboard">dashboard</Link>
         </nav>
         <AnimatedRoutes />
+        <FloatingChatbot />
       </div>
     </BrowserRouter>
   );
