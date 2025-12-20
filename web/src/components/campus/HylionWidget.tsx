@@ -61,8 +61,8 @@ export const HylionWidget = () => {
   }
 
   return (
-    <section className="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl p-8 text-white mb-10 shadow-lg">
-      <div className="flex items-center justify-between gap-4">
+    <section className="relative bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl p-8 text-white mb-10 shadow-lg">
+      <div className="flex items-center gap-4 pr-24">
         {/* 왼쪽: 하이리온 아이콘 + 인사말 */}
         <div className="flex items-center gap-1 flex-1 min-w-0">
           {/* 하이리온 아이콘 - 애니메이션 추가 */}
@@ -103,17 +103,15 @@ export const HylionWidget = () => {
             )}
           </div>
         </div>
-
-        {/* 오른쪽: 상세보기 버튼만 */}
-        <div className="flex-shrink-0">
-          <Link
-            to="/hylion"
-            className="inline-block bg-white text-purple-600 px-4 py-2 rounded-lg font-bold hover:bg-purple-50 transition shadow-md text-xs whitespace-nowrap"
-          >
-            상세보기 →
-          </Link>
-        </div>
       </div>
+
+      {/* 오른쪽 하단: 상세보기 버튼 */}
+      <Link
+        to="/hylion"
+        className="absolute bottom-6 right-6 bg-white text-purple-600 px-4 py-2 rounded-lg font-bold hover:bg-purple-50 transition shadow-md text-xs whitespace-nowrap"
+      >
+        상세보기 →
+      </Link>
     </section>
   );
 };
