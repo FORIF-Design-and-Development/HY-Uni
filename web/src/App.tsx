@@ -18,7 +18,6 @@ import DashboardPage from "./pages/DashboardPage";
 import CafeteriaPage from "./pages/campus/CafeteriaPage";
 
 import MapPage from "./pages/campus/MapPage";
-import CampusMapPage from "./pages/campus/CampusMapView";
 import PlaceListPage from "./pages/campus/HotPlaceView";
 
 import ChatbotPage from "./pages/campus/ChatbotPage";
