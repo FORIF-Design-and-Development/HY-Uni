@@ -1,6 +1,13 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import React, { useEffect } from 'react';
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import React, { useEffect } from "react";
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 
 import FindEmailTest from "./pages/auth/FindEmailTest";
 import LoginTest from "./pages/auth/LoginTest";
@@ -9,27 +16,31 @@ import ResetPasswordTest from "./pages/auth/ResetPasswordTest";
 
 import DashboardPage from "./pages/DashboardPage";
 import CafeteriaPage from "./pages/campus/CafeteriaPage";
+
+import MapPage from "./pages/campus/MapPage";
+import CampusMapPage from "./pages/campus/CampusMapView";
+import PlaceListPage from "./pages/campus/HotPlaceView";
+
 import ChatbotPage from "./pages/campus/ChatbotPage";
-import HylionPage from './pages/campus/HylionPage';
+import HylionPage from "./pages/campus/HylionPage";
 import NoticePage from "./pages/campus/NoticePage";
 import ReviewPage from "./pages/campus/ReviewPage";
 import Timetable from "./pages/campus/TimetablePage";
 
-import BoardDetailPage from './pages/community/BoardDetailPage';
-import BoardListPage from './pages/community/BoardListPage';
-import CommunityHomePage from './pages/community/CommunityHomePage';
-import CreatePostPage from './pages/community/CreatePostPage';
-import FilteringKeywordSettingsPage from './pages/community/FilteringKeywordSettingsPage';
-import HashtagSettingsPage from './pages/community/HashtagSettingsPage';
-import InternationalBoardPage from './pages/community/InternationalBoardPage';
-import KeywordSettingsPage from './pages/community/KeywordSettingsPage';
-import MyBoardPage from './pages/community/MyBoardPage';
-import NotificationsPage from './pages/community/NotificationsPage';
-import PollCreationPage from './pages/community/PollCreationPage';
-import PostDetailPage from './pages/community/PostDetailPage';
-import SearchPage from './pages/community/SearchPage';
-import SettingsPage from './pages/community/SettingsPage';
-
+import BoardDetailPage from "./pages/community/BoardDetailPage";
+import BoardListPage from "./pages/community/BoardListPage";
+import CommunityHomePage from "./pages/community/CommunityHomePage";
+import CreatePostPage from "./pages/community/CreatePostPage";
+import FilteringKeywordSettingsPage from "./pages/community/FilteringKeywordSettingsPage";
+import HashtagSettingsPage from "./pages/community/HashtagSettingsPage";
+import InternationalBoardPage from "./pages/community/InternationalBoardPage";
+import KeywordSettingsPage from "./pages/community/KeywordSettingsPage";
+import MyBoardPage from "./pages/community/MyBoardPage";
+import NotificationsPage from "./pages/community/NotificationsPage";
+import PollCreationPage from "./pages/community/PollCreationPage";
+import PostDetailPage from "./pages/community/PostDetailPage";
+import SearchPage from "./pages/community/SearchPage";
+import SettingsPage from "./pages/community/SettingsPage";
 
 // --- Components ---
 
@@ -65,7 +76,6 @@ const AnimatedRoutes = () => {
     <AnimatePresence mode="wait">
       <PageTransition>
         <Routes location={location} key={location.pathname}>
-
           <Route path="/register" element={<RegisterTest />} />
           <Route path="/login" element={<LoginTest />} />
           <Route path="/test/find-email" element={<FindEmailTest />} />
@@ -74,6 +84,9 @@ const AnimatedRoutes = () => {
           <Route path="/timetable" element={<Timetable />} />
           <Route path="/campus/notices" element={<NoticePage />} />
           <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
+          <Route path="/campus/map" element={<MapPage />} />
+          <Route path="/campus/place" element={<PlaceListPage />} />
+
           <Route path="/reviews/:courseId" element={<ReviewPage />} />
           <Route path="/hylion" element={<HylionPage />} />
 
@@ -81,29 +94,36 @@ const AnimatedRoutes = () => {
           <Route path="/" element={<Navigate to="/campus/notices" replace />} />
 
           <Route path="/community" element={<CommunityHomePage />} />
-          <Route path="/community/notifications" element={<NotificationsPage />} />
+          <Route
+            path="/community/notifications"
+            element={<NotificationsPage />}
+          />
           <Route path="/community/create" element={<CreatePostPage />} />
           <Route path="/community/create/poll" element={<PollCreationPage />} />
           <Route path="/community/board-list" element={<BoardListPage />} />
           <Route path="/community/search" element={<SearchPage />} />
           <Route path="/community/board/my" element={<MyBoardPage />} />
-          <Route path="/community/board/international" element={<InternationalBoardPage />} />
+          <Route
+            path="/community/board/international"
+            element={<InternationalBoardPage />}
+          />
           <Route path="/community/board/:type" element={<BoardDetailPage />} />
           <Route path="/community/settings" element={<SettingsPage />} />
           <Route path="/community/keywords" element={<KeywordSettingsPage />} />
-          <Route path="/community/filtering-keywords" element={<FilteringKeywordSettingsPage />} />
+          <Route
+            path="/community/filtering-keywords"
+            element={<FilteringKeywordSettingsPage />}
+          />
           <Route path="/community/hashtags" element={<HashtagSettingsPage />} />
           <Route path="/community/post/:id" element={<PostDetailPage />} />
           <Route path="/community/post/:id/edit" element={<CreatePostPage />} />
 
           <Route path="*" element={<Navigate to="/campus/notices" replace />} />
-
         </Routes>
       </PageTransition>
     </AnimatePresence>
   );
 };
-
 
 export default function App() {
   return (

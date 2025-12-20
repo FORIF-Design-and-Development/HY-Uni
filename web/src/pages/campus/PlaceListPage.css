@@ -1,0 +1,188 @@
+.place-list-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.place-list-container.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  color: #888;
+  font-size: 1.2rem;
+}
+
+/* 헤더 카드 */
+.place-header-card {
+  background-color: #0e4a84;
+  color: white;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.header-content .sub-title {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.header-content .title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* ⭐️ 카카오 맵 스타일 */
+.kakao-map-container {
+  width: 100%;
+  height: 400px; /* 지도 높이 고정 */
+  margin-bottom: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  border: 1px solid #eee;
+}
+
+.kakao-map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-error {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+/* 카테고리 필터 */
+.category-filter {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  background-color: white;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  color: #555;
+}
+
+.filter-btn:hover {
+  background-color: #f5f5f5;
+}
+
+.filter-btn.active {
+  background-color: #0e4a84;
+  color: white;
+  border-color: #0e4a84;
+  font-weight: 600;
+}
+
+/* 그리드 레이아웃 */
+.place-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.no-data {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+/* 장소 카드 */
+.place-card {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid #eee;
+}
+
+.place-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.place-img {
+  width: 100%;
+  height: 160px;
+  background-size: cover;
+  background-position: center;
+  background-color: #eee;
+}
+
+.place-info {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.place-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.place-category {
+  font-size: 0.75em;
+  color: #0e4a84;
+  background: #eef4fb;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.place-rating {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: #f39c12;
+}
+
+.place-name {
+  margin: 0 0 6px 0;
+  font-size: 1.15em;
+  font-weight: 700;
+  color: #333;
+}
+
+.place-addr {
+  font-size: 0.85em;
+  color: #666;
+  margin: 0 0 10px 0;
+  line-height: 1.4;
+}
+
+.place-review-count {
+  margin-top: auto; /* 하단으로 밀기 */
+  font-size: 0.8em;
+  color: #999;
+  text-align: right;
+}
