@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { getNotifications, Notification, NotificationType } from '../../api/community/notification.api';
-import { getPostDetail } from '../../api/community/post.api';
+import {
+  getNotifications,
+  Notification,
+  NotificationType,
+  getNotificationStreamUrl,
+  markAllNotificationsAsRead,
+  markNotificationAsRead
+} from '../../api/community/notification.api';
 import { getHomeData } from '../../api/community/home.api';
 import { toKST, getNowKST } from '../../utils/date';
+import { CheckCheck } from 'lucide-react';
 
 type TabType = 'general' | 'my' | 'keyword';
 
@@ -15,6 +22,8 @@ interface NotificationItem {
   content: string;
   date: string;
   postId?: number; // 게시글 클릭을 위한 ID
+  isRead: boolean;
+  rawType: NotificationType; // 필터링을 위해 원본 타입 유지
 }
 
 // 날짜 포맷팅 함수 (한국 시간 기준)
@@ -30,7 +39,7 @@ function formatDate(dateString: string): string {
   if (diffMins < 60) return `${diffMins}분 전`;
   if (diffHours < 24) return `${diffHours}시간 전`;
   if (diffDays < 7) return `${diffDays}일 전`;
-  
+
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const hours = String(date.getHours()).padStart(2, '0');
@@ -79,6 +88,7 @@ const NotificationsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [favoriteBoardIds, setFavoriteBoardIds] = useState<number[]>([]);
+  const eventSourceRef = React.useRef<EventSource | null>(null);
 
   // 즐겨찾기 게시판 ID 조회
   useEffect(() => {
@@ -94,93 +104,89 @@ const NotificationsPage: React.FC = () => {
     loadFavoriteBoards();
   }, []);
 
-  // 알림 목록 조회 및 처리
+  // 단일 알림 처리 함수 (SSE 및 목록 조회 공용)
+  const processNotification = (notification: Notification): NotificationItem | null => {
+    if (!notification.entityId) return null;
+
+    try {
+      const notificationTab = getNotificationTab(notification.type);
+
+      // 현재 탭과 일치하지 않으면 무시 (실시간 알림일 경우 탭에 따라 필터링)
+      if (activeTab === 'general' && notificationTab !== 'general') return null;
+      if (activeTab === 'my' && notificationTab !== 'my') return null;
+      if (activeTab === 'keyword') return null;
+
+      // 데이터가 없는 경우 (오류 상황)
+      if (!notification.postTitle || !notification.boardName || !notification.boardId) {
+        return null;
+      }
+
+      // 일반 탭: 즐겨찾기 게시판인지 확인
+      if (activeTab === 'general') {
+        if (favoriteBoardIds.length > 0 && notification.boardId && !favoriteBoardIds.includes(notification.boardId)) {
+          return null;
+        }
+
+        return {
+          id: notification.id,
+          category: notification.boardName,
+          title: notification.postTitle || '',
+          content: notification.postContent ? (
+            notification.postContent.length > 50
+              ? notification.postContent.substring(0, 50) + '...'
+              : notification.postContent
+          ) : '',
+          date: formatDate(notification.createdAt),
+          postId: notification.entityId,
+          isRead: notification.isRead,
+          rawType: notification.type,
+        };
+      }
+      // My 탭: 내 게시글/댓글 관련 알림
+      else if (activeTab === 'my') {
+        const title = getNotificationTitle(notification.type);
+
+        let content = '';
+        if (notification.type === 'new_comment_on_post' || notification.type === 'new_reply_on_comment') {
+          content = notification.postContent ? (
+            notification.postContent.length > 50
+              ? notification.postContent.substring(0, 50) + '...'
+              : notification.postContent
+          ) : '';
+        }
+
+        return {
+          id: notification.id,
+          title,
+          content,
+          date: formatDate(notification.createdAt),
+          postId: notification.entityId,
+          isRead: notification.isRead,
+          rawType: notification.type,
+        };
+      }
+
+      return null;
+    } catch (err: any) {
+      return null;
+    }
+  };
+
+  // 알림 목록 조회
   useEffect(() => {
     const loadNotifications = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // 모든 알림 조회
-        const response = await getNotifications(100, 0);
-        
-        // 각 알림에 대해 게시글 정보 조회 (병렬 처리)
-        const processedNotifications: NotificationItem[] = [];
-        
-        // 탭별로 필터링된 알림만 처리
-        const filteredNotifications = response.notifications.filter(notification => {
-          const notificationTab = getNotificationTab(notification.type);
-          if (activeTab === 'general') {
-            return notificationTab === 'general' && notification.entityId !== null;
-          } else if (activeTab === 'my') {
-            return notificationTab === 'my' && notification.entityId !== null;
-          } else if (activeTab === 'keyword') {
-            return false; // 키워드 알림은 현재 API에 없음
-          }
-          return false;
-        });
 
-        // Promise.allSettled를 사용하여 일부 실패해도 계속 진행
-        const notificationPromises = filteredNotifications.map(async (notification) => {
-          if (!notification.entityId) return null;
-          
-          try {
-            const postDetail = await getPostDetail(notification.entityId);
-            
-            // 일반 탭: 즐겨찾기 게시판인지 확인
-            if (activeTab === 'general') {
-              if (favoriteBoardIds.length > 0 && !favoriteBoardIds.includes(postDetail.board.id)) {
-                return null;
-              }
-              
-              return {
-                id: notification.id,
-                category: postDetail.board.name,
-                title: postDetail.title,
-                content: postDetail.content.length > 50 
-                  ? postDetail.content.substring(0, 50) + '...' 
-                  : postDetail.content,
-                date: formatDate(notification.createdAt),
-                postId: notification.entityId,
-              };
-            }
-            // My 탭: 내 게시글/댓글 관련 알림
-            else if (activeTab === 'my') {
-              const title = getNotificationTitle(notification.type);
-              
-              let content = '';
-              if (notification.type === 'new_comment_on_post' || notification.type === 'new_reply_on_comment') {
-                content = postDetail.content.length > 50 
-                  ? postDetail.content.substring(0, 50) + '...' 
-                  : postDetail.content;
-              }
-              
-              return {
-                id: notification.id,
-                title,
-                content,
-                date: formatDate(notification.createdAt),
-                postId: notification.entityId,
-              };
-            }
-            
-            return null;
-          } catch (err: any) {
-            // 404 에러는 조용히 처리 (삭제된 게시글은 정상적인 경우)
-            return null;
-          }
-        });
+        // 모든 알림 조회 (백엔드에서 JOIN된 데이터가 옴)
+        const response = await getNotifications(50, 0); // limit 50
 
-        // Promise.allSettled로 일부 실패해도 계속 진행
-        const results = await Promise.allSettled(notificationPromises);
-        
-        // 성공한 결과만 필터링
-        const validNotifications = results
-          .filter((result): result is PromiseFulfilledResult<NotificationItem | null> => 
-            result.status === 'fulfilled' && result.value !== null
-          )
-          .map(result => result.value!);
-        
+        // 즉시 매핑 처리 (비동기 호출 없음)
+        const validNotifications = response.notifications
+          .map(processNotification)
+          .filter((item): item is NotificationItem => item !== null);
+
         setNotifications(validNotifications);
       } catch (err: any) {
         console.error('알림 목록 조회 실패:', err);
@@ -191,12 +197,64 @@ const NotificationsPage: React.FC = () => {
       }
     };
 
-    loadNotifications();
+    if (favoriteBoardIds.length > 0 || activeTab === 'my') {
+      loadNotifications();
+    }
   }, [activeTab, favoriteBoardIds]);
 
-  const handleNotificationClick = (postId?: number) => {
-    if (postId) {
-      navigate(`/community/post/${postId}`);
+  // SSE 실시간 알림 연결
+  useEffect(() => {
+    // 기존 연결 종료
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    const url = getNotificationStreamUrl();
+    const es = new EventSource(url, { withCredentials: true });
+    eventSourceRef.current = es;
+
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'notification' && data.notification) {
+          // 동기적으로 처리 가능
+          const newItem = processNotification(data.notification);
+          if (newItem) {
+            setNotifications(prev => [newItem, ...prev]);
+          }
+        }
+      } catch (err) {
+        console.error('SSE 메시지 파싱 오류:', err);
+      }
+    };
+
+    return () => {
+      es.close();
+    };
+  }, [activeTab, favoriteBoardIds]); // 의존성 변경 시 재연결하여 필터링 로직(processNotification) 갱신
+
+  const handleNotificationClick = async (notificationId: number, postId?: number) => {
+    if (!postId) return;
+
+    try {
+      // 읽음 처리 (에러가 나도 이동은 함)
+      await markNotificationAsRead(notificationId);
+    } catch (err) {
+      console.error('알림 읽음 처리 실패:', err);
+    }
+
+    navigate(`/community/post/${postId}`);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (confirm('모든 알림을 읽음 처리하시겠습니까?')) {
+      try {
+        await markAllNotificationsAsRead();
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        alert('모든 알림이 읽음 처리되었습니다.');
+      } catch (err: any) {
+        alert(err.response?.data?.error?.message || '처리 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -228,11 +286,12 @@ const NotificationsPage: React.FC = () => {
     return (
       <div className="divide-y divide-gray-100">
         {notifications.map((item, idx) => (
-          <div 
-            key={item.id} 
-            className="p-4 bg-white hover:bg-gray-50 transition-colors animate-fade-in-up cursor-pointer"
+          <div
+            key={item.id}
+            className={`p-4 transition-colors animate-fade-in-up cursor-pointer ${item.isRead ? 'bg-white hover:bg-gray-50' : 'bg-blue-50/50 hover:bg-blue-50'
+              }`}
             style={{ animationDelay: `${idx * 50}ms` }}
-            onClick={() => handleNotificationClick(item.postId)}
+            onClick={() => handleNotificationClick(item.id, item.postId)}
           >
             {item.category && (
               <div className="text-xs text-gray-500 mb-1 font-medium">{item.category}</div>
@@ -254,14 +313,21 @@ const NotificationsPage: React.FC = () => {
     <div className="bg-white min-h-screen font-sans">
       {/* Header */}
       <header className="flex items-center h-14 px-4 bg-white sticky top-0 z-10 border-b border-gray-100 animate-fade-in-up">
-        <button 
-          onClick={() => navigate(-1)} 
+        <button
+          onClick={() => navigate(-1)}
           className="p-2 -ml-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors btn-press"
           aria-label="Go back"
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h1 className="flex-1 text-center text-lg font-bold text-gray-900 pr-8">알림</h1>
+        <h1 className="flex-1 text-center text-lg font-bold text-gray-900">알림</h1>
+        <button
+          onClick={handleMarkAllAsRead}
+          className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+          title="모두 읽음 처리"
+        >
+          <CheckCheck className="w-5 h-5" />
+        </button>
       </header>
 
       {/* Tabs */}
@@ -271,9 +337,8 @@ const NotificationsPage: React.FC = () => {
             <button
               key={tab}
               onClick={() => setActiveTab(tab as TabType)}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 btn-press ${
-                activeTab === tab ? 'bg-blue-100 text-gray-900 scale-105' : 'bg-blue-50 text-gray-500'
-              }`}
+              className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 btn-press ${activeTab === tab ? 'bg-blue-100 text-gray-900 scale-105' : 'bg-blue-50 text-gray-500'
+                }`}
             >
               {tab === 'general' ? '일반' : tab === 'my' ? 'My' : '키워드'}
             </button>

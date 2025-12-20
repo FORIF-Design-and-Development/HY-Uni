@@ -26,6 +26,11 @@ export interface Notification {
   entityId: number | null;
   isRead: boolean;
   createdAt: string;
+  // JOIN 된 추가 정보
+  postTitle?: string;
+  postContent?: string;
+  boardId?: number;
+  boardName?: string;
 }
 
 // 알림 목록 응답
@@ -65,7 +70,7 @@ export async function getNotifications(
     limit: limit.toString(),
     offset: offset.toString(),
   });
-  
+
   if (isRead !== undefined) {
     params.append('isRead', isRead.toString());
   }
@@ -110,4 +115,14 @@ export async function getUnreadNotificationCount(): Promise<UnreadCountResponse>
     '/community/notifications/unread-count'
   );
   return response.data.data;
+}
+
+/**
+ * 실시간 알림 스트림 URL 조회 (SSE)
+ * @returns SSE 연결 URL
+ */
+export function getNotificationStreamUrl(): string {
+  // api.defaults.baseURL이 설정되어 있다고 가정
+  const baseURL = api.defaults.baseURL || '/api';
+  return `${baseURL}/community/notifications/stream`;
 }
