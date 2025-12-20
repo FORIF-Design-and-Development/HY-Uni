@@ -41,6 +41,7 @@ import PollCreationPage from "./pages/community/PollCreationPage";
 import PostDetailPage from "./pages/community/PostDetailPage";
 import SearchPage from "./pages/community/SearchPage";
 import SettingsPage from "./pages/community/SettingsPage";
+import AcademicCalendarPage from "./pages/campus/AcademicCalendarPage.tsx";
 
 // --- Components ---
 
@@ -86,6 +87,10 @@ const AnimatedRoutes = () => {
           <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
           <Route path="/campus/map" element={<MapPage />} />
           <Route path="/campus/place" element={<PlaceListPage />} />
+          <Route
+            path="/campus/academic_calendar"
+            element={<AcademicCalendarPage />}
+          />
 
           <Route path="/reviews/:courseId" element={<ReviewPage />} />
           <Route path="/hylion" element={<HylionPage />} />

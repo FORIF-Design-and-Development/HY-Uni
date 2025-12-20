@@ -63,7 +63,7 @@ export default function CampusMapPage() {
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
+    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
       {/* 3. 헤더 영역 (검색창 포함) */}
       <div
         style={{
@@ -89,7 +89,7 @@ export default function CampusMapPage() {
             <div style={{ fontSize: 14, opacity: 0.8, marginBottom: 4 }}>
               HYU Campus Map
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>🗺️ 캠퍼스 지도</div>
+            <div style={{ fontSize: 24, fontWeight: 700 }}>캠퍼스 MAP</div>
           </div>
         </div>
 

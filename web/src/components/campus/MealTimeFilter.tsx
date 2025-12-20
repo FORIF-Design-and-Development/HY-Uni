@@ -1,30 +1,33 @@
-import { MealTime } from '../../api/campus/cafeteria.api';
+import { MealTime } from "../../api/campus/cafeteria.api";
 
 interface MealTimeFilterProps {
-  selectedMealTime: MealTime | 'all';
-  onMealTimeChange: (mealTime: MealTime | 'all') => void;
+  selectedMealTime: MealTime | "all";
+  onMealTimeChange: (mealTime: MealTime | "all") => void;
 }
 
-export function MealTimeFilter({ selectedMealTime, onMealTimeChange }: MealTimeFilterProps) {
+export function MealTimeFilter({
+  selectedMealTime,
+  onMealTimeChange,
+}: MealTimeFilterProps) {
   const mealTimes: Array<{
-    value: MealTime | 'all';
+    value: MealTime | "all";
     label: string;
     icon: string;
   }> = [
-    { value: 'all', label: '전체', icon: '🍽️' },
-    { value: 'breakfast', label: '조식', icon: '🌅' },
-    { value: 'lunch', label: '중식', icon: '☀️' },
-    { value: 'dinner', label: '석식', icon: '🌙' },
+    { value: "all", label: "전체", icon: "🍽️" },
+    { value: "breakfast", label: "조식", icon: "🌅" },
+    { value: "lunch", label: "중식", icon: "☀️" },
+    { value: "dinner", label: "석식", icon: "🌙" },
   ];
 
   return (
     <div
       style={{
-        display: 'flex',
-        gap: 10,
-        justifyContent: 'center',
+        display: "flex",
+        gap: 8,
+        justifyContent: "center",
         marginBottom: 24,
-        flexWrap: 'wrap',
+        flexWrap: "wrap",
       }}
     >
       {mealTimes.map((mealTime) => {
@@ -34,29 +37,29 @@ export function MealTimeFilter({ selectedMealTime, onMealTimeChange }: MealTimeF
             key={mealTime.value}
             onClick={() => onMealTimeChange(mealTime.value)}
             style={{
-              padding: '10px 20px',
+              padding: "10px 20px",
               borderRadius: 999,
-              border: isActive ? 'none' : '1px solid #ECEFF1',
-              backgroundColor: isActive ? '#0E4A84' : '#ffffff',
-              color: isActive ? '#ffffff' : '#0E4A84',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
+              border: isActive ? "none" : "1px solid #ECEFF1",
+              backgroundColor: isActive ? "#0E4A84" : "#ffffff",
+              color: isActive ? "#ffffff" : "#0E4A84",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
               gap: 6,
               fontSize: 14,
               fontWeight: isActive ? 700 : 600,
-              transition: 'all 0.2s',
+              transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
               if (!isActive) {
-                e.currentTarget.style.backgroundColor = '#F7F9FA';
-                e.currentTarget.style.borderColor = '#0E4A84';
+                e.currentTarget.style.backgroundColor = "#F7F9FA";
+                e.currentTarget.style.borderColor = "#0E4A84";
               }
             }}
             onMouseLeave={(e) => {
               if (!isActive) {
-                e.currentTarget.style.backgroundColor = '#ffffff';
-                e.currentTarget.style.borderColor = '#ECEFF1';
+                e.currentTarget.style.backgroundColor = "#ffffff";
+                e.currentTarget.style.borderColor = "#ECEFF1";
               }
             }}
           >

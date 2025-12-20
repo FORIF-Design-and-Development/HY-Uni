@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { MealTime } from '../../api/campus/cafeteria.api';
-import { CafeteriaCard } from '../../components/campus/CafeteriaCard';
-import { MealTimeFilter } from '../../components/campus/MealTimeFilter';
-import { useCafeteriaStore } from '../../store/cafeteria.store';
+import { useEffect } from "react";
+import { MealTime } from "../../api/campus/cafeteria.api";
+import { CafeteriaCard } from "../../components/campus/CafeteriaCard";
+import { MealTimeFilter } from "../../components/campus/MealTimeFilter";
+import { useCafeteriaStore } from "../../store/cafeteria.store";
 
 export default function CafeteriaPage() {
   const {
@@ -21,14 +21,21 @@ export default function CafeteriaPage() {
     }
   }, []);
 
-  const handleMealTimeChange = (mealTime: MealTime | 'all') => {
+  const handleMealTimeChange = (mealTime: MealTime | "all") => {
     setSelectedMealTime(mealTime);
   };
 
   if (isLoading) {
     return (
-      <div style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', padding: '60px 20px', fontSize: 16, color: '#898C8E' }}>
+      <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "60px 20px",
+            fontSize: 16,
+            color: "#898C8E",
+          }}
+        >
           메뉴를 불러오는 중...
         </div>
       </div>
@@ -37,21 +44,21 @@ export default function CafeteriaPage() {
 
   if (error) {
     return (
-      <div style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <p style={{ color: '#d32f2f', marginBottom: 20 }}>{error}</p>
+      <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", padding: "60px 20px" }}>
+          <p style={{ color: "#d32f2f", marginBottom: 20 }}>{error}</p>
           <button
             onClick={() => {
               clearError();
               fetchTodayMenus();
             }}
             style={{
-              padding: '10px 20px',
-              backgroundColor: '#0E4A84',
-              color: '#ffffff',
-              border: 'none',
+              padding: "10px 20px",
+              backgroundColor: "#0E4A84",
+              color: "#ffffff",
+              border: "none",
               borderRadius: 8,
-              cursor: 'pointer',
+              cursor: "pointer",
               fontSize: 14,
               fontWeight: 600,
             }}
@@ -64,15 +71,15 @@ export default function CafeteriaPage() {
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
       <div
         style={{
-          backgroundColor: '#0E4A84',
-          color: '#ffffff',
-          padding: '20px 24px',
+          backgroundColor: "#0E4A84",
+          color: "#ffffff",
+          padding: "20px 24px",
           borderRadius: 12,
           marginBottom: 24,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
         }}
       >
         <div style={{ fontSize: 14, opacity: 0.8, marginBottom: 4 }}>
@@ -102,7 +109,13 @@ export default function CafeteriaPage() {
       </div>
 
       {(!todayMenus || todayMenus.cafeterias.length === 0) && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#898C8E' }}>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "60px 20px",
+            color: "#898C8E",
+          }}
+        >
           <p>오늘의 메뉴 정보가 없습니다.</p>
         </div>
       )}
