@@ -12,6 +12,10 @@ export interface RecommendedPost {
     name: string;
   };
   createdAt: string;
+  recommendationReason?: {
+    matchedKeywords: string[];
+    matchedTags: string[];
+  };
 }
 
 // 즐겨찾기 게시판의 최신 게시글 타입
