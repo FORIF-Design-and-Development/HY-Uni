@@ -13,6 +13,7 @@ import {
   togglePostScrap,
   updatePostWithRelations,
   votePostPoll,
+  removePostVote,
   type BoardPostSortBy,
 } from '../../models/community/post.model';
 import { checkAndUpdateMission, logMissionAction } from '../../services/campus/hylion/hylion.service';
@@ -1113,6 +1114,116 @@ export async function votePostPollHandler(
       data: null,
       error: {
         message: '게시글 투표 처리 중 오류가 발생했습니다.',
+        code: 'INTERNAL_ERROR',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+    next(error);
+  }
+}
+
+// 게시글 투표 취소
+// - 게시글 ID를 받아서 사용자의 투표를 취소하는 HTTP 핸들러
+export async function removePostVoteHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = (req as any).userId;
+
+    // 게시글 ID 파라미터 추출 및 검증
+    const postId = Number.parseInt(req.params.postId ?? '', 10);
+
+    if (!Number.isInteger(postId) || postId <= 0) {
+      res.status(400).json({
+        data: null,
+        error: {
+          message: '유효하지 않은 게시글 ID입니다.',
+          code: 'INVALID_POST_ID',
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    // 모델 함수 호출
+    try {
+      const result = await removePostVote(postId, userId);
+
+      // 게시글 투표 취소 성공 시 200 응답
+      res.status(200).json({
+        data: {
+          pollId: result.pollId,
+          userVote: {
+            selectedOptionId: result.userVote.selectedOptionId,
+          },
+          results: result.results,
+        },
+        error: null,
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error: any) {
+      // 모델 레이어에서 발생한 에러 처리
+      if (error instanceof Error) {
+        if (error.message === 'POST_NOT_FOUND') {
+          res.status(404).json({
+            data: null,
+            error: {
+              message: '해당 ID의 게시글을 찾을 수 없습니다.',
+              code: 'POST_NOT_FOUND',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+
+        if (error.message === 'POLL_NOT_FOUND') {
+          res.status(404).json({
+            data: null,
+            error: {
+              message: '해당 게시글에 투표가 없습니다.',
+              code: 'POLL_NOT_FOUND',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+
+        if (error.message === 'NO_VOTE_FOUND') {
+          res.status(400).json({
+            data: null,
+            error: {
+              message: '취소할 투표가 없습니다.',
+              code: 'NO_VOTE_FOUND',
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          });
+          return;
+        }
+      }
+
+      throw error;
+    }
+  } catch (error) {
+    // 서버 오류 처리
+    // TODO: middleware로 refactoring
+    res.status(500).json({
+      data: null,
+      error: {
+        message: '게시글 투표 취소 처리 중 오류가 발생했습니다.',
         code: 'INTERNAL_ERROR',
       },
       meta: {
