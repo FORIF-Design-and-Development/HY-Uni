@@ -1,7 +1,14 @@
 import { pool } from "../../config/db";
 
 export const CustomModel = {
-  create: async (userId, title, day, start, end, location) => {
+  create: async (
+    userId: number,
+    title: string,
+    day: string,
+    start: string,
+    end: string,
+    location: string
+  ) => {
     const [result] = await pool.query(
       `
       INSERT INTO custom_schedule (user_id, title, day, start_time, end_time, location)

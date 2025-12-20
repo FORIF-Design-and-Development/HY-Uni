@@ -23,6 +23,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
 # 서버 전체에서 공유할 ChatSession (지연 초기화)
 session: Optional[ChatSession] = None
 
@@ -80,3 +81,4 @@ def chat(req: ChatRequest):
             answer=f"챗봇 서비스 오류가 발생했습니다: {str(e)}",
             meta={"error": str(e)}
         )
+

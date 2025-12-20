@@ -138,7 +138,11 @@ export default function DashboardPage() {
             <span className="text-xs font-bold">커뮤니티</span>
           </Link>
 
-          <button className="relative p-2 -mr-2 text-gray-400 hover:text-[#016ABF] transition-colors">
+          <Link
+            to="/community/notifications"
+            className="relative p-2 -mr-2 text-gray-400 hover:text-[#016ABF] transition-colors"
+            aria-label="알림"
+          >
             <svg
               className="w-6 h-6"
               fill="none"
@@ -154,7 +158,7 @@ export default function DashboardPage() {
             </svg>
             {/* 알림 점 (Secondary Color) */}
             <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FE7716] border border-white"></span>
-          </button>
+          </Link>
         </div>
       </header>
 
