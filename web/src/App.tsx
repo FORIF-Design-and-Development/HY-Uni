@@ -5,13 +5,6 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react
 import FindEmailTest from "./pages/auth/FindEmailTest";
 import LoginTest from "./pages/auth/LoginTest";
 import RegisterTest from "./pages/auth/RegisterTest";
-<<<<<<< HEAD
-import ResetPasswordTest from "./pages/auth/ResetPasswordTest.tsx";
-import { CafeteriaPage } from "./pages/campus/CafeteriaPage.tsx"; // ✅ 추가
-import NoticePage from "./pages/campus/NoticePage.tsx";
-import ReviewPage from "./pages/campus/ReviewPage";
-import Timetable from "./pages/campus/TimetablePage.tsx";
-=======
 import ResetPasswordTest from "./pages/auth/ResetPasswordTest";
 
 import DashboardPage from "./pages/DashboardPage";
@@ -78,10 +71,10 @@ const AnimatedRoutes = () => {
           <Route path="/test/find-email" element={<FindEmailTest />} />
           <Route path="/test/reset-password" element={<ResetPasswordTest />} />
           <Route path="/chatbot" element={<ChatbotPage />} />
-          <Route path="/timetable" element={<Timetable />} />
+          <Route path="/campus/timetable" element={<Timetable />} />
           <Route path="/campus/notices" element={<NoticePage />} />
           <Route path="/campus/cafeteria" element={<CafeteriaPage />} />
-          <Route path="/reviews/:courseId" element={<ReviewPage />} />
+          <Route path="/campus/reviews/:courseId" element={<ReviewPage />} />
           <Route path="/hylion" element={<HylionPage />} />
 
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -111,7 +104,6 @@ const AnimatedRoutes = () => {
   );
 };
 
->>>>>>> 4033419cdfa51d49da7aae4e815aafcd4e420467
 
 export default function App() {
   return (

@@ -1,14 +1,7 @@
-<<<<<<< HEAD
 import { useEffect } from 'react';
 import TimetableHeader from "../../components/campus/TimetableHeader";
 import TimetableGrid from "../../components/campus/TimetableGrid";
 import CourseSearchPanel from "../../components/campus/CourseSearchPanel";
-=======
-import { useEffect } from "react";
-import TimetableHeader from "../../components/timetable/TimetableHeader";
-import TimetableGrid from "../../components/timetable/TimetableGrid";
-import CourseSearchPanel from "../../components/timetable/CourseSearchPanel";
->>>>>>> 4033419cdfa51d49da7aae4e815aafcd4e420467
 import { useTimetableStore } from "../../store/timetable.store";
 import { useAuthStore } from '../../store/auth.store';
 
